@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OWNED_BIRDIE, bedBox, boxesOverlap } from './birdies'
+import { OWNED_BIRDIE, bedBox, boxesOverlap, marekBeds } from './birdies'
 import { fillCage, measureGaps, snapBedCentre } from './layout'
 
 const spec = { ...OWNED_BIRDIE, brand: 'birdies' as const, rot: 0 as const }
@@ -27,6 +27,16 @@ describe('measureGaps', () => {
     const bedGaps = gaps.filter((g) => g.kind === 'bed')
     expect(bedGaps.length).toBeGreaterThan(0)
     expect(bedGaps.every((g) => g.ok)).toBe(true)
+  })
+
+  it('keeps Marek wall beds on the sleeper face out of the tight list', () => {
+    const gaps = measureGaps(marekBeds(), { length: 10, width: 4.6, ...aisles })
+    const sideWalls = gaps.filter((g) => g.kind === 'wall' && g.z1 === g.z2)
+    expect(sideWalls.length).toBe(6)
+    expect(sideWalls.every((g) => g.ok)).toBe(true)
+    const aisle = gaps.filter((g) => g.kind === 'bed' && g.x1 !== g.x2)
+    expect(aisle.length).toBeGreaterThan(0)
+    expect(aisle.every((g) => g.ok && g.metres > 1)).toBe(true)
   })
 })
 

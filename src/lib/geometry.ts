@@ -1,5 +1,5 @@
 import { archShoulderPoint, buildArch, forcedEllipse } from './arch'
-import { bedBox, bedFootprint, bedInsideCage, boxesOverlap, type PlacedBed } from './birdies'
+import { bedBox, bedFootprint, bedInsideCage, boxesOverlap, onSleeperInnerFace, type PlacedBed } from './birdies'
 import { emptyBracing, layoutBracing, type Bracing } from './bracing'
 import { frameHeights, HOOP_MATERIAL, SLEEPER, STAR_ACROSS_MM, WALL_MESH, type CageInputs, round2 } from './model'
 import { layoutV2, meshRunM, shadeClothMetres, V2_HOOP_CUT_M, V2_MESH, V2_NET_BOTTOM, type V2Frame } from './v2'
@@ -782,7 +782,20 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
       text: 'Beds overlap. Rotate or drag so paths stay ~0.5–0.6 m for a barrow.',
     })
   }
-  if (geo.sideGap < 0.4 && input.beds.length > 1 && outside.length === 0) {
+  // Beds hard against the sleeper are inside the clear width. v2 legs stay vertical to hoopStartY, so a short bed does not meet the arch.
+  const halfW = input.width / 2
+  let sideClear = Infinity
+  for (const b of input.beds) {
+    const box = bedBox(b)
+    sideClear = Math.min(sideClear, box.x0 + halfW, halfW - box.x1)
+  }
+  const onSleeper =
+    input.sleeperBase &&
+    input.design === 'v2' &&
+    input.beds.length > 0 &&
+    input.beds.every((b) => b.height <= geo.hoopStartY + 1e-6) &&
+    onSleeperInnerFace(sideClear)
+  if (geo.sideGap < 0.4 && input.beds.length > 1 && outside.length === 0 && !onSleeper) {
     out.push({
       level: 'info',
       text: `Only ${geo.sideGap.toFixed(2)} m between outer beds and the fence. Work sides want ~0.80 m to squat.`,

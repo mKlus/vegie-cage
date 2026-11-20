@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { packOwnedFour } from './birdies'
+import { marekBeds, packOwnedFour } from './birdies'
 import { buildGeometry, hoopArcLength, hoopRadius, hoopStations, layoutBeds, warnings } from './geometry'
 import { DEFAULTS, PRESETS, sanitise } from './model'
 
@@ -47,10 +47,13 @@ describe('hoop stations', () => {
 })
 
 describe('beds', () => {
-  it('four owned Birdies fit in the Marek 5×10 default', () => {
+  it('Marek beds fit in the 5×10 default', () => {
     const { fit, beds } = layoutBeds(DEFAULTS)
-    expect(beds).toHaveLength(4)
+    expect(beds).toHaveLength(8)
     expect(fit).toBe(true)
+    expect(DEFAULTS.beds).toEqual(marekBeds())
+    const preset = PRESETS.find((p) => p.id === 'marek-5x10')
+    expect(preset?.patch.beds).toEqual(marekBeds())
   })
 
   it('flags overflow when a bed sits outside', () => {
@@ -178,6 +181,8 @@ describe('buildGeometry', () => {
     expect(marek.some((w) => w.level === 'info' && /rabbit or fox/.test(w.text) && /150 mm/.test(w.text))).toBe(true)
     expect(marek.some((w) => /50 mm mesh/.test(w.text))).toBe(false)
     expect(marek.some((w) => /not certified engineering/.test(w.text) && w.level === 'warn')).toBe(true)
+    expect(marek.some((w) => w.level === 'bad' && /outside the cage/.test(w.text))).toBe(false)
+    expect(marek.some((w) => /outer beds and the fence/.test(w.text))).toBe(false)
     expect(marek.some((w) => /Hoop spacing over 1\.2 m/.test(w.text))).toBe(true)
     expect(marek.some((w) => /slides over a MaxY/.test(w.text))).toBe(true)
     expect(buildGeometry(DEFAULTS).wind.over).toBe(false)
