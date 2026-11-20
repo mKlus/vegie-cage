@@ -23,6 +23,15 @@ import {
   round2,
 } from './model'
 import {
+  V2_ESTIMATE_AUD,
+  V2_MESH,
+  V2_POST,
+  V2_PRICE,
+  battenStockCount,
+  shadeClothMetres,
+  sleeperStockCount,
+} from './v2'
+import {
   PRICE_NOTE,
   birdiesBedAud,
   formatAud,
@@ -46,6 +55,8 @@ export type BomLine = {
   unitAud: number
   lineAud: number
   inTotal: boolean
+  /** Shelf price is an estimate or an allowance, not a checked list price. */
+  estimate?: boolean
 }
 
 export type BomResult = {
@@ -112,7 +123,541 @@ function coilOrSticks(exactM: number, stockM: number, kind: 'coil' | 'stick', ex
 const SLEEPER_STOCK_M = 2.4
 const STAPLES_PER_KG = 400
 
+function bedSection(input: CageInputs): { bedLines: BomLine[]; soilTotal: number; growTotal: number } {
+  const bedLines: BomLine[] = []
+  const grouped = new Map<
+    string,
+    { label: string; owned: number; buy: number; m2: number; m3: number; w: number; l: number; h: number }
+  >()
+  for (const bed of input.beds) {
+    const key = bedSku(bed)
+    const g = grouped.get(key) ?? {
+      label: bedLabel(bed),
+      owned: 0,
+      buy: 0,
+      m2: 0,
+      m3: 0,
+      w: bed.width,
+      l: bed.length,
+      h: bed.height,
+    }
+    if (bed.owned) g.owned += 1
+    else g.buy += 1
+    g.m2 += growingM2(bed)
+    g.m3 += soilM3(bed)
+    grouped.set(key, g)
+  }
+  let gi = 0
+  for (const g of grouped.values()) {
+    gi += 1
+    const n = g.owned + g.buy
+    const unit = birdiesBedAud(g.w, g.l, g.h)
+    bedLines.push(
+      moneyLine(
+        {
+          id: `birdies-${gi}`,
+          category: 'Birdies',
+          item: g.label,
+          spec: 'Aluzinc steel, PVC safety edge, stainless fasteners. Size ±50 mm.',
+          exact: `${n} bed${n === 1 ? '' : 's'} · ${g.m2.toFixed(2)} m² soil surface · ${g.m3.toFixed(2)} m³ fill`,
+          exactM: round2(g.m3),
+          buy: g.buy === 0 ? `${g.owned} owned — none to buy` : `${g.buy} to buy` + (g.owned ? ` (${g.owned} already owned)` : ''),
+          note: 'Birdies Select-A-Size. Same width/height family mixes lengths. Pale Eucalypt is Colorbond mist green.',
+        },
+        g.buy,
+        unit,
+      ),
+    )
+  }
+  if (input.beds.length === 0) {
+    bedLines.push(
+      moneyLine(
+        {
+          id: 'beds-empty',
+          category: 'Birdies',
+          item: 'No beds placed',
+          spec: 'Add from the Birdies picker, then drag on the Plan view',
+          exact: '0',
+          exactM: 0,
+          buy: '—',
+          note: 'Four 122 × 244 × 37 cm Pale Eucalypt beds are already bought — Pack 4 owned to drop them in.',
+        },
+        0,
+        0,
+        false,
+      ),
+    )
+  }
+  const soilTotal = input.beds.reduce((s, b) => s + soilM3(b), 0)
+  const growTotal = input.beds.reduce((s, b) => s + growingM2(b), 0)
+  const soilQuote = price('soil-m3')
+  bedLines.push(
+    moneyLine(
+      {
+        id: 'soil',
+        category: 'Birdies',
+        item: 'Potting mix / soil fill',
+        spec: 'Fill to ~20 mm below the safety edge',
+        exact: `${soilTotal.toFixed(2)} m³ (${(soilTotal * 1000).toFixed(0)} L)`,
+        exactM: round2(soilTotal),
+        buy: `Bulk ${soilTotal.toFixed(2)} m³ (or ${Math.ceil(soilTotal / 0.03)} × 30 L bags)`,
+        note: 'Birdies walls are thin steel — volume is the outside L × W × H. Priced as bulk mix.',
+      },
+      round2(soilTotal),
+      soilQuote.aud,
+    ),
+  )
+  const bedsToBuy = input.beds.filter((b) => !b.owned).length
+  if (bedsToBuy > 0) {
+    const ship = price('birdies-ship')
+    bedLines.push(
+      moneyLine(
+        {
+          id: 'birdies-ship',
+          category: 'Birdies',
+          item: 'Birdies shipping',
+          spec: 'Flat rate mainland AU (Birdies listed $25.50)',
+          exact: '1 order',
+          exactM: 0,
+          buy: '1 × shipping',
+          note: 'Edging excluded. Remote depot extra.',
+        },
+        1,
+        ship.aud,
+      ),
+    )
+  }
+  return { bedLines, soilTotal, growTotal }
+}
+
+function buildV2Bom(input: CageInputs): BomResult {
+  const geo = buildGeometry(input)
+  const frame = geo.v2
+  const lines: BomLine[] = []
+  const standard = Math.abs(input.length - 10) < 0.02 && Math.abs(input.width - 4.6) < 0.02
+  const hoopM = round2(geo.hoopCount * geo.pipeEachM)
+  const polyRolls = Math.max(1, Math.ceil(hoopM / 100 - 1e-9))
+  lines.push(
+    moneyLine(
+      {
+        id: 'hoop-pipe',
+        category: 'Frame',
+        item: 'Hoop pipe',
+        spec: 'Vinidex Rural Plus 50 mm (2 in) × 100 m',
+        exact: `${geo.hoopCount} hoops × ${geo.pipeEachM.toFixed(2)} m = ${hoopM.toFixed(1)} m`,
+        exactM: hoopM,
+        buy: `${polyRolls} × 100 m roll`,
+        note: 'Sleeved over the full picket, down to the ground. 1.0 m vertical legs plus a semi-ellipse. Bunnings rural poly, 20 Nov 2026. No ridge pipe.',
+      },
+      polyRolls,
+      V2_PRICE.polyRoll,
+    ),
+  )
+
+  const battenN = frame?.battenStock ?? battenStockCount(input.length, input.width, 4, 1.89)
+  const perLine = Math.max(1, Math.ceil((input.length - 1e-9) / V2_PRICE.battenM))
+  const diagN = frame?.diagonals.length ?? 0
+  const diagCut = frame?.diagonalCut ?? 0
+  const diagBars = diagN === 0 ? 0 : Math.max(1, Math.ceil((diagN * diagCut - 1e-9) / V2_PRICE.battenM))
+  lines.push(
+    moneyLine(
+      {
+        id: 'battens',
+        category: 'Frame',
+        item: 'Roof battens',
+        spec: 'Stramit 40 mm 0.55 BMT TRUECORE, 6.1 m',
+        exact: `7 lines × ${perLine} + 2 end headers + 1 back rail + ${diagBars} diagonal lengths = ${battenN}`,
+        exactM: round2(battenN * V2_PRICE.battenM),
+        buy: `${battenN} × 6.1 m`,
+        note: `Ridge ${input.peakHeight.toFixed(2)} m, upper shoulders 2.36 m, lower shoulders 1.88 m, low lines 0.90 m. Screwed and UV-tied at every hoop. Door-end rails come from the header offcuts. Diagonals cut ${diagCut.toFixed(2)} m. Online NSW supplier. Freight to Bega not checked.`,
+      },
+      battenN,
+      V2_PRICE.batten,
+    ),
+  )
+
+  const sleeperN = input.sleeperBase ? sleeperStockCount(input.length, input.width) : 0
+  if (sleeperN > 0) {
+    lines.push(
+      moneyLine(
+        {
+          id: 'sleeper',
+          category: 'Fence',
+          item: 'Base sleeper',
+          spec: '200 × 50 mm × 2.4 m H4 MicroPro (Sienna)',
+          exact: `Outside about ${(input.width + 0.16).toFixed(2)} × ${(input.length + 0.2).toFixed(2)} m`,
+          exactM: round2(sleeperN * V2_PRICE.sleeperM),
+          buy: `${sleeperN} × 2.4 m`,
+          note: '150 mm buried, 50 mm above. Sides join over pickets. Every picket bolted through the sleeper. Bunnings, 20 Nov 2026.',
+        },
+        sleeperN,
+        V2_PRICE.sleeper,
+      ),
+    )
+  }
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'end-posts',
+        category: 'Door',
+        item: 'End posts',
+        spec: '50 × 50 × 2.0 mm galv SHS, 6.0 m',
+        exact: `4 × ${V2_POST.lengthM.toFixed(1)} m posts, ${Math.round(V2_POST.embedM * 1000)} mm in concrete, from ${V2_POST.stockLengths} × ${V2_POST.stockM.toFixed(1)} m`,
+        exactM: V2_POST.stockLengths * V2_POST.stockM,
+        buy: `${V2_POST.stockLengths} × 6.0 m`,
+        note: 'ESTIMATE. Page lists $30–$120 by length. 6 m price not shown. Both ends, centres ±0.555 m.',
+        estimate: true,
+      },
+      V2_POST.stockLengths,
+      V2_POST.unitAud,
+    ),
+  )
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'door-concrete',
+        category: 'Door',
+        item: 'Concrete',
+        spec: 'Australian Builders Quick Set, 20 kg',
+        exact: `4 holes ~${Math.round(V2_POST.holeDiaM * 1000)} mm dia × ${Math.round(V2_POST.embedM * 1000)} mm deep, 3 bags each`,
+        exactM: V2_POST.concreteBags,
+        buy: `${V2_POST.concreteBags} × 20 kg`,
+        note: 'Bunnings, 20 Nov 2026. Cure 24 h before loading the posts.',
+      },
+      V2_POST.concreteBags,
+      V2_PRICE.concrete,
+    ),
+  )
+
+  if (input.doorStyle === 'mesh-gate') {
+    lines.push(
+      moneyLine(
+        {
+          id: 'mesh-gate',
+          category: 'Door',
+          item: 'Mesh gate',
+          spec: 'Galvanised mesh gate 1800 h × 1000 w, 25NB frame',
+          exact: `${input.doorWidth.toFixed(2)} × ${input.doorHeight.toFixed(2)} m, opens outward`,
+          exactM: round2(input.doorWidth * input.doorHeight),
+          buy: '1 gate',
+          note: 'RHS Steel, Revesby NSW. Freight extra. Head at about 1.87 m. Nothing in the opening.',
+        },
+        1,
+        V2_PRICE.gate,
+      ),
+    )
+  }
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'ironmongery',
+        category: 'Door',
+        item: 'Hinges and latch',
+        spec: 'Hinges and latch to suit a 50 mm square post',
+        exact: '1 set',
+        exactM: 0,
+        buy: '1 set',
+        note: 'ALLOWANCE, not verified. A latch a dog cannot nose.',
+        estimate: true,
+      },
+      1,
+      V2_PRICE.hardware,
+    ),
+  )
+
+  const wallM = geo.meshRunM
+  const meshRolls = Math.max(1, Math.ceil(wallM / V2_MESH.rollM - 1e-9))
+  lines.push(
+    moneyLine(
+      {
+        id: 'wall-mesh',
+        category: 'Fence',
+        item: 'Wall mesh',
+        spec: 'Jack 25 × 25 mm welded cage mesh, 900 mm × 5 m',
+        exact: `${wallM.toFixed(2)} m × 0.90 m band (0.05–0.95 m), gate left out`,
+        exactM: wallM,
+        buy: `${meshRolls} × 5 m rolls`,
+        note: 'Screwed under a pine strip on the sleeper. Hog-ringed to the hoop legs. No apron. Bunnings, 20 Nov 2026.',
+      },
+      meshRolls,
+      V2_PRICE.mesh,
+    ),
+  )
+
+  const pineN = Math.max(1, Math.ceil(wallM / V2_PRICE.pineStripM - 1e-9))
+  lines.push(
+    moneyLine(
+      {
+        id: 'clamp-strip',
+        category: 'Fence',
+        item: 'Clamp strip',
+        spec: 'Treated pine 42 × 18 mm H3, 5.4 m',
+        exact: `${wallM.toFixed(2)} m on the sleeper top`,
+        exactM: wallM,
+        buy: `${pineN} × 5.4 m`,
+        note: 'Price from the Bunnings dressed-treated category listing, 20 Nov 2026. DPC under the mesh, then this strip.',
+      },
+      pineN,
+      V2_PRICE.pineStrip,
+    ),
+  )
+
+  const screwPacks = standard ? 1 : Math.max(1, Math.ceil(wallM / 0.25 / 500))
+  lines.push(
+    moneyLine(
+      {
+        id: 'pine-screws',
+        category: 'Fixings',
+        item: 'Treated-pine screws',
+        spec: 'Titan Weather Force 10g × 50 mm, 500 pack',
+        exact: 'Clamp strip every 250 mm, plus sleeper corners',
+        exactM: screwPacks * 500,
+        buy: `${screwPacks} × 500`,
+        note: 'Bunnings, 20 Nov 2026. Treated-pine screws only in the timber.',
+      },
+      screwPacks,
+      V2_PRICE.screws,
+    ),
+  )
+
+  const tekPacks = standard ? 3 : Math.max(1, Math.ceil((14 * geo.hoopCount + 8 * diagN + 80) / 100))
+  lines.push(
+    moneyLine(
+      {
+        id: 'teks',
+        category: 'Fixings',
+        item: 'Tek screws',
+        spec: 'Buildex 10g × 16 mm Class 4, 100 pack',
+        exact: '2 per batten crossing, 4 on each lap, 8 on each diagonal, plus headers and rails',
+        exactM: tekPacks * 100,
+        buy: `${tekPacks} × 100`,
+        note: 'Bunnings, 20 Nov 2026. Crown of the batten out. Clutch drill. Class 4 only.',
+      },
+      tekPacks,
+      V2_PRICE.teks,
+    ),
+  )
+
+  const tiePacks = standard ? 5 : Math.max(1, Math.ceil((geo.hoopCount * 40) / 100))
+  lines.push(
+    moneyLine(
+      {
+        id: 'cable-ties',
+        category: 'Fixings',
+        item: 'UV cable ties',
+        spec: 'Crescent 300 × 4.8 mm black, 100 pack',
+        exact: '2 crossed ties at each batten crossing, 1 at each diagonal end, net every 300 mm',
+        exactM: tiePacks * 100,
+        buy: `${tiePacks} × 100`,
+        note: 'Bunnings, 20 Nov 2026. UV-stable. Tie the net to every batten line.',
+      },
+      tiePacks,
+      V2_PRICE.ties,
+    ),
+  )
+
+  const boltCount = geo.pickets.total + V2_POST.stockLengths * 2
+  const boltPacks = Math.max(1, Math.ceil(boltCount / V2_PRICE.boltPack - 1e-9))
+  lines.push(
+    moneyLine(
+      {
+        id: 'bolts',
+        category: 'Fixings',
+        item: 'Cup-head bolts',
+        spec: 'Zenith M10 × 130 mm HDG bolts and nuts, 25 pack',
+        exact: `${boltCount} bolts (pickets to the sleeper, plus 4 posts)`,
+        exactM: boltCount,
+        buy: `${boltPacks} × 25`,
+        note: 'Bunnings, 20 Nov 2026. About 50 mm below ground, nut inside. Cut long tails. Mark picket holes before the poly goes on.',
+      },
+      boltPacks,
+      V2_PRICE.bolts,
+    ),
+  )
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'cold-gal',
+        category: 'Fixings',
+        item: 'Cold galv',
+        spec: 'White Knight Cold Gal spray, 300 g',
+        exact: '1 can, every cut and hole',
+        exactM: 1,
+        buy: '1 can',
+        note: 'Bunnings, 20 Nov 2026. Every cut batten end and every drilled hole. Keep the Zincalume off the timber.',
+      },
+      1,
+      V2_PRICE.coldGal,
+    ),
+  )
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'dpc',
+        category: 'Fence',
+        item: 'DPC strip',
+        spec: "DPC or builder's plastic under the mesh",
+        exact: '1 roll along the sleeper top',
+        exactM: wallM,
+        buy: '1 allowance',
+        note: 'ALLOWANCE. Isolates the galv mesh from the copper-treated sleeper.',
+        estimate: true,
+      },
+      1,
+      V2_PRICE.dpc,
+    ),
+  )
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'hog-rings',
+        category: 'Fixings',
+        item: 'Hog rings',
+        spec: '3/4 in hog rings and Mr Pen pliers',
+        exact: 'Mesh to the hoop legs every 250 mm',
+        exactM: 0,
+        buy: 'already owned',
+        note: 'Already owned. Not in the total. Not for the net.',
+      },
+      0,
+      0,
+      false,
+    ),
+  )
+
+  const galstar = input.postType === 'star' && input.picketLength === 1.8
+  const owned = galstar ? Math.min(input.ownedPickets, geo.pickets.total) : 0
+  const postBuy = geo.pickets.total - owned
+  const postUnit = galstar ? V2_PRICE.picket : postPrice(input.postType, input.picketLength).aud
+  lines.push(
+    moneyLine(
+      {
+        id: 'posts',
+        category: 'Fence',
+        item: 'Pickets',
+        spec: galstar ? 'Waratah Galstar MaxY 180 cm' : `${input.picketLength.toFixed(2)} m posts`,
+        exact: `${geo.pickets.total} pickets, ${Math.round(input.embedDepth * 1000)} mm in the ground, ${geo.stickUp.toFixed(2)} m out`,
+        exactM: geo.pickets.total,
+        buy: owned > 0 ? `already have ${owned}; buy ${postBuy}` : `${postBuy} pickets`,
+        note: galstar
+          ? 'Bacchus Marsh Farm Supplies list, 20 Nov 2026. Seen $24.08–$29.50 elsewhere. Hoop pickets only. No caps: the poly covers them.'
+          : 'Not the MaxY price. Check the yard.',
+      },
+      postBuy,
+      postUnit,
+    ),
+  )
+
+  if (input.cover === 'shade-30') {
+    const metres = shadeClothMetres(input.length, input.width)
+    const rolls = Math.max(1, Math.ceil(metres / 20 - 1e-9))
+    lines.push(
+      moneyLine(
+        {
+          id: 'cover',
+          category: 'Cover',
+          item: 'Shade cloth',
+          spec: 'Pillar 3.66 × 20 m green 30% shade cloth',
+          exact: `${metres.toFixed(1)} m used (2 roof strips + 2 ends)`,
+          exactM: metres,
+          buy: `${rolls} × 3.66 × 20 m`,
+          note: 'Bunnings, 20 Nov 2026. 9 hoops at 1.25 m, and 6 batten diagonals. Cloth from the ridge down to 0.80 m.',
+        },
+        rolls,
+        V2_PRICE.shadeCloth,
+      ),
+    )
+  } else {
+    lines.push(
+      moneyLine(
+        {
+          id: 'cover',
+          category: 'Cover',
+          item: 'Bird net',
+          spec: 'Backyard Farmer 10 × 10 m × 5 mm anti-bird net',
+          exact: `Roof 6.7 × ${input.length.toFixed(1)} m + both ends from the remainder`,
+          exactM: geo.net.usedM2,
+          buy: geo.net.buy,
+          note: 'Bunnings category, 20 Nov 2026. Net from the ridge down to 0.80 m, overlapping the mesh 150 mm. 5 mm net will not stop cabbage moth.',
+        },
+        geo.net.pieces,
+        V2_PRICE.birdNet,
+      ),
+    )
+  }
+
+  if (input.skirtMode !== 'none' && input.skirtDepth > 0) {
+    const folded = input.skirtMode === 'l-outward'
+    lines.push(
+      moneyLine(
+        {
+          id: 'skirt',
+          category: 'Fence',
+          item: folded ? 'L-folded apron' : 'Buried skirt',
+          spec: 'Extra 25 mm welded mesh, separate from the wall band',
+          exact: `${geo.perimeterM.toFixed(2)} m × ${input.skirtDepth.toFixed(2)} m`,
+          exactM: round2(geo.perimeterM),
+          buy: 'Not in the v2 default — add if digging shows up',
+          note: folded
+            ? 'Marek’s build has no apron. This line is only because the skirt was turned on.'
+            : 'Separate from the wall band. Bury it vertical. The default build has no skirt.',
+        },
+        0,
+        0,
+        false,
+      ),
+    )
+  }
+
+  if (input.tomatoTrellis) {
+    lines.push(
+      moneyLine(
+        {
+          id: 'tomato-trellis',
+          category: 'Inside',
+          item: 'Tomato trellis',
+          spec: '2 × Whites Ultrapost 2.4 m + Whites Dog Fence Medium 120 cm × 10 m',
+          exact: 'Separate fence inside the cage. Not the walls, the skirt, or the door.',
+          exactM: 10,
+          buy: 'already have',
+          note: 'Optional. Already bought. Do not use it on the cage.',
+        },
+        0,
+        0,
+        false,
+      ),
+    )
+  }
+
+  const beds = bedSection(input)
+  const cageAud = roundMoney(lines.reduce((s, l) => s + (l.inTotal ? l.lineAud : 0), 0))
+  const bedsAud = roundMoney(beds.bedLines.reduce((s, l) => s + (l.inTotal ? l.lineAud : 0), 0))
+  return {
+    lines,
+    bedLines: beds.bedLines,
+    geo,
+    totals: {
+      hoopPipeM: round1(hoopM),
+      meshM: round1(wallM),
+      netM2: round1(geo.net.usedM2),
+      timberM: round1(sleeperN * V2_PRICE.sleeperM + pineN * V2_PRICE.pineStripM),
+      soilM3: round1(beds.soilTotal),
+      growM2: round1(beds.growTotal),
+      cageAud,
+      bedsAud,
+    },
+    priceNote: `AUD GST-inc list prices, 20 Nov 2026. Totals include $${V2_ESTIMATE_AUD.toFixed(2)} of estimates (end-post steel $180, hinges and latch $45, DPC $20) and exclude freight. Not a quote.`,
+  }
+}
+
 export function buildBom(input: CageInputs): BomResult {
+  if (input.design === 'v2') return buildV2Bom(input)
   const geo = buildGeometry(input)
   const hoop = HOOP_MATERIAL[input.hoopMaterial]
   const mesh = WALL_MESH[input.wallMesh]
@@ -695,109 +1240,10 @@ export function buildBom(input: CageInputs): BomResult {
     ),
   )
 
-  const grouped = new Map<
-    string,
-    { label: string; owned: number; buy: number; m2: number; m3: number; w: number; l: number; h: number }
-  >()
-  for (const bed of input.beds) {
-    const key = bedSku(bed)
-    const g = grouped.get(key) ?? {
-      label: bedLabel(bed),
-      owned: 0,
-      buy: 0,
-      m2: 0,
-      m3: 0,
-      w: bed.width,
-      l: bed.length,
-      h: bed.height,
-    }
-    if (bed.owned) g.owned += 1
-    else g.buy += 1
-    g.m2 += growingM2(bed)
-    g.m3 += soilM3(bed)
-    grouped.set(key, g)
-  }
-  let gi = 0
-  for (const g of grouped.values()) {
-    gi += 1
-    const n = g.owned + g.buy
-    const unit = birdiesBedAud(g.w, g.l, g.h)
-    bedLines.push(
-      moneyLine(
-        {
-          id: `birdies-${gi}`,
-          category: 'Birdies',
-          item: g.label,
-          spec: 'Aluzinc steel, PVC safety edge, stainless fasteners. Size ±50 mm.',
-          exact: `${n} bed${n === 1 ? '' : 's'} · ${g.m2.toFixed(2)} m² soil surface · ${g.m3.toFixed(2)} m³ fill`,
-          exactM: round2(g.m3),
-          buy: g.buy === 0 ? `${g.owned} owned — none to buy` : `${g.buy} to buy` + (g.owned ? ` (${g.owned} already owned)` : ''),
-          note: 'Birdies Select-A-Size. Same width/height family mixes lengths. Pale Eucalypt is Colorbond mist green.',
-        },
-        g.buy,
-        unit,
-      ),
-    )
-  }
-  if (input.beds.length === 0) {
-    bedLines.push(
-      moneyLine(
-        {
-          id: 'beds-empty',
-          category: 'Birdies',
-          item: 'No beds placed',
-          spec: 'Add from the Birdies picker, then drag on the Plan view',
-          exact: '0',
-          exactM: 0,
-          buy: '—',
-          note: 'Four 122 × 244 × 37 cm Pale Eucalypt beds are already bought — Pack 4 owned to drop them in.',
-        },
-        0,
-        0,
-        false,
-      ),
-    )
-  }
-
-  const soilTotal = input.beds.reduce((s, b) => s + soilM3(b), 0)
-  const growTotal = input.beds.reduce((s, b) => s + growingM2(b), 0)
-  const soilQuote = price('soil-m3')
-  bedLines.push(
-    moneyLine(
-      {
-        id: 'soil',
-        category: 'Birdies',
-        item: 'Potting mix / soil fill',
-        spec: 'Fill to ~20 mm below the safety edge',
-        exact: `${soilTotal.toFixed(2)} m³ (${(soilTotal * 1000).toFixed(0)} L)`,
-        exactM: round2(soilTotal),
-        buy: `Bulk ${soilTotal.toFixed(2)} m³ (or ${Math.ceil(soilTotal / 0.03)} × 30 L bags)`,
-        note: 'Birdies walls are thin steel — volume is the outside L × W × H. Priced as bulk mix.',
-      },
-      round2(soilTotal),
-      soilQuote.aud,
-    ),
-  )
-  const bedsToBuy = input.beds.filter((b) => !b.owned).length
-  if (bedsToBuy > 0) {
-    const ship = price('birdies-ship')
-    bedLines.push(
-      moneyLine(
-        {
-          id: 'birdies-ship',
-          category: 'Birdies',
-          item: 'Birdies shipping',
-          spec: 'Flat rate mainland AU (Birdies listed $25.50)',
-          exact: '1 order',
-          exactM: 0,
-          buy: '1 × shipping',
-          note: 'Edging excluded. Remote depot extra.',
-        },
-        1,
-        ship.aud,
-      ),
-    )
-  }
+  const beds = bedSection(input)
+  bedLines.push(...beds.bedLines)
+  const soilTotal = beds.soilTotal
+  const growTotal = beds.growTotal
 
   const tieCoils = ceilTo(wire.tieM, TIE_WIRE_STOCK_M)
   const tieQuote = price('tie-wire-30')
@@ -1033,7 +1479,7 @@ function dumpLines(rows: BomLine[]): string[] {
     out.push(`${line.item} — ${line.spec}`)
     out.push(`  exact: ${line.exact}`)
     out.push(`  buy:   ${line.buy}`)
-    if (line.inTotal) out.push(`  est:   ${formatAud(line.lineAud)}`)
+    if (line.inTotal) out.push(`  est:   ${formatAud(line.lineAud)}${line.estimate ? ' (estimate)' : ''}`)
     if (line.note) out.push(`  note:  ${line.note}`)
     out.push('')
   }

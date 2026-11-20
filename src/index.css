@@ -248,6 +248,8 @@ button.is-on {
 .d-bed { stroke: #1c2416; stroke-width: 1; }
 .d-guy { fill: none; stroke: #ff5c1a; stroke-width: 2.6; stroke-linecap: round; }
 .d-brace { fill: none; stroke: #ff2d3a; stroke-width: 3; stroke-linecap: round; }
+.d-batten { fill: none; stroke: #3aa0ff; stroke-width: 2.4; stroke-linecap: round; }
+.d-batten-dot { fill: #3aa0ff; stroke: #0b1c33; stroke-width: 0.5; }
 .d-anchor { fill: #ffd84a; stroke: #6b4e10; stroke-width: 1; }
 .d-door-mark { stroke: var(--timber); stroke-width: 6; stroke-linecap: round; }
 .d-dim { fill: var(--ink); font-size: 12px; font-family: var(--sans); }

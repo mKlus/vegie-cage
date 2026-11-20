@@ -44,6 +44,7 @@ function acrossFromSide(posts: ExtraPost[], z: number, width: number): number[] 
 
 /** Build steps for the current cage. Lengths and counts come from the same inputs as the cut list. */
 export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
+  if (input.design === 'v2' && geo.v2) return buildV2Guide(input, geo)
   const hoop = HOOP_MATERIAL[input.hoopMaterial]
   const mesh = WALL_MESH[input.wallMesh]
   const pipe = pipeTakeoff(input, geo.hoopCount, geo.pipeEachM)
@@ -186,6 +187,100 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
     },
   ]
 
+  return steps
+}
+
+function buildV2Guide(input: CageInputs, geo: CageGeometry): Step[] {
+  const frame = geo.v2!
+  const shade = input.cover === 'shade-30'
+  const cover = shade
+    ? '30% shade cloth: two roof strips, then the ends'
+    : 'bird net: roof first, then both ends, gate opening cut out'
+  const mid = shade ? ' Shade cloth also gets one pair in bay 4.' : ''
+  const steps: Step[] = [
+    {
+      id: 'markout',
+      title: 'Mark out',
+      text: `Call 1100 (Dial Before You Dig) before any peg, picket, or trench. Measure the beds first and confirm the ${formatM(input.width, 2)} picket centres (bed width plus 0.06 m). This build is ${formatM(input.length, 2)} long, peak ${formatM(input.peakHeight, 2)}. Square the first corner with a 3-4-5 triangle, then check both full diagonals.`,
+    },
+    {
+      id: 'test-pull',
+      title: 'Test-pull one picket',
+      text: `Drive one Galstar MaxY ${mm(input.embedDepth)} into the ground. Push it sideways at ${formatM(geo.stickUp, 2)}. If it moves easily, go deeper or concrete the corner pickets before you drive the rest. Soil is the unknown.`,
+    },
+    {
+      id: 'pickets',
+      title: 'Drive the pickets',
+      text: `Drive all the pickets on a string line. ${geo.hoopCount} hoops at ${formatM(geo.actualSpacing, 2)}, so ${geo.hoopCount} pickets each side (${geo.pickets.total} in all). ${input.picketLength.toFixed(2)} m pickets, ${mm(input.embedDepth)} in, ${formatM(geo.stickUp, 2)} out. Leave the door opening clear. No extra end-wall pickets: the ends are steel posts.`,
+    },
+    {
+      id: 'posts',
+      title: 'Concrete the end posts',
+      text: `Four 50×50×2 galv SHS posts, 3.0 m, cut from two 6.0 m bars. Set ${mm(0.55)} in concrete, both ends, at ±${frame.postX.toFixed(3)} m off the centreline. About ${formatM(frame.endPosts[0]?.top ?? 2.45, 2)} stays above ground. Cure 24 h. The door-end pair carries the gate.`,
+    },
+    {
+      id: 'sleeper',
+      title: 'Sleeper ring',
+      text: `Trench ${mm(SLEEPER.buryM)} and lay the 200×50 H4 MicroPro ring: ${mm(SLEEPER.buryM)} buried, ${mm(SLEEPER.revealM)} above. Sides join over pickets. Screw the corners. Do not bolt the pickets yet.`,
+    },
+    {
+      id: 'hoops',
+      title: 'Poly hoops',
+      text: `Check that 50 mm rural poly (about 60 mm outside) slides over a MaxY before you cut the roll. Warm the pipe and cut ${geo.hoopCount} hoops at ${geo.pipeEachM.toFixed(2)} m. Each hoop is a ${formatM(geo.stickUp, 2)} vertical leg plus a semi-ellipse, peak ${formatM(input.peakHeight, 2)}. Slide each hoop to the ground over its picket pair.`,
+    },
+    {
+      id: 'bolts',
+      title: 'Bolt the hoops down',
+      text: `Bolt each picket through the poly and the sleeper with an M10×130 HDG cup-head, about 50 mm below ground, nut inside. ${geo.pickets.total} picket bolts plus 4 post-to-sleeper bolts. Cut the long tails.`,
+    },
+    {
+      id: 'battens',
+      title: 'Seven roof battens',
+      text: `Crown out. Fit the ridge at ${formatM(input.peakHeight, 2)}, then the two low battens at ${formatM(frame.lowY, 2)}, then the four shoulder battens (upper at ${formatM(frame.upperY, 2)}, lower at ${formatM(frame.lowerY, 2)}). Two 10g×16 teks and two crossed UV ties at every hoop. Check the hoops are plumb and the spacing is ${formatM(geo.actualSpacing, 2)}. Each line is two 6.1 m lengths, nested from ${formatM(frame.lapFrom, 2)} to ${formatM(frame.lapTo, 2)} off the door end, with 4 teks in the lap. Stagger the laps between neighbouring lines. No tensioned wires.`,
+    },
+    {
+      id: 'headers',
+      title: 'Headers and end rails',
+      text: `End header at ${formatM(frame.headerY, 2)}, ${formatM(frame.headerHalf * 2, 2)} hoop to hoop, on each end. Two teks into each post face, and two teks plus two UV ties to the end hoop. It is the gate lintel: gate head about 1.87 m, 80 mm clear. Tie each post top to the end hoop at about 2.43 m, one tek and a UV tie. Door-end low rails, 2 × ${formatM(frame.rails[0]?.cutM ?? 1.75, 2)}, from the posts out to the walls at ${formatM(frame.lowY, 2)}. Back-end low rail ${formatM(input.width, 2)} at the same height. The door rails come from the header offcuts.`,
+    },
+    {
+      id: 'diagonals',
+      title: 'Batten diagonals',
+      text: `Square the frame lengthways (the two floor diagonals equal), then screw the diagonals. ${frame.diagonals.length} in all, cut ${frame.diagonalCut.toFixed(2)} m (${frame.diagonalLength.toFixed(2)} m bolt to bolt, ${frame.diagonalAngle.toFixed(1)}° in the roof surface). Each runs from the low batten at the end hoop up to the lower-shoulder batten on the next hoop, both sides.${mid} The diagonal lies over the battens. At each end: 4 teks through both, plus 1 UV tie round the hoop. No other batten is crossed. No outside guys, no Gripples, no angle stays. Layout is on the Stays & bracing diagram.`,
+    },
+    {
+      id: 'cold-galv',
+      title: 'Cold-galv the cuts',
+      text: 'Cold-galv every cut batten end and every drilled hole before the mesh goes on. Keep the Zincalume battens off the treated timber.',
+    },
+    {
+      id: 'mesh',
+      title: 'Mesh band',
+      text: `DPC on the sleeper top, then the 900 mm 25 mm welded mesh from 0.05 m to 0.95 m, then the 42×18 H3 pine strip, screwed with 10g×50 every 250 mm. Hog-ring the mesh to the hoop legs every 250 mm. Tie the mesh top to the 0.90 m batten. No chicken wire. No apron. A rabbit can still dig under the ${mm(SLEEPER.buryM)} sleeper: watch that line.`,
+    },
+    {
+      id: 'gate',
+      title: 'Gate',
+      text: `Hang the ${formatM(input.doorWidth, 2)} × ${formatM(input.doorHeight, 2)} mesh gate on the door-end posts so it opens outward. Bottom about 0.07 m, head about 1.87 m. Nothing projects into the opening or the swing.`,
+    },
+    {
+      id: 'cover',
+      title: shade ? 'Shade cloth' : 'Bird net',
+      text: `Fit the ${cover}. The cover comes down to ${formatM(0.8, 2)} and overlaps the mesh by ${mm(NET_OVERLAP_M)}. Tie it to every batten line every 300 mm.`,
+    },
+  ]
+  if (input.tomatoTrellis) {
+    steps.push({
+      id: 'tomato',
+      title: 'Tomato trellis',
+      text: 'Optional, and already bought. Inside the cage, not on the walls or the door: stand 2 × Whites Ultrapost 2.4 m and hang Whites Dog Fence Medium, 120 cm × 10 m, as a tomato trellis.',
+    })
+  }
+  steps.push({
+    id: 'recheck',
+    title: 'After the first blow',
+    text: `Re-check the ties and the teks after the first big blow. The diagonals rely on teks in 0.55 mm steel: 4 at each end. Peak still reads ${formatM(input.peakHeight, 2)}.`,
+  })
   return steps
 }
 

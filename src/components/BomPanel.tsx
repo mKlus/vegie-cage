@@ -11,7 +11,8 @@ type BomPanelProps = {
 }
 
 function priceCell(line: BomLine): string {
-  return line.inTotal ? formatAud(line.lineAud) : '—'
+  if (!line.inTotal) return '—'
+  return line.estimate ? `${formatAud(line.lineAud)} est.` : formatAud(line.lineAud)
 }
 
 function BomTable({ title, total, lines }: { title: string; total: number; lines: BomLine[] }) {

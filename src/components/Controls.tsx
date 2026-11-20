@@ -24,6 +24,7 @@ import {
   type NetType,
   type PicketLength,
   type PostType,
+  type CoverOption,
   type PurlinMaterial,
   type PurlinSet,
   type SkirtMode,
@@ -432,7 +433,12 @@ export function Controls({
             ))}
           </select>
         </label>
-        {input.postType === 'star' && input.picketLength === 1.8 && input.ownedPickets > 0 ? (
+        {input.design === 'v2' && input.postType === 'star' && input.picketLength === 1.8 ? (
+          <p className="hint">
+            Galstar MaxY 180 cm, $29.50 each. Bacchus Marsh Farm Supplies list, 20 Nov 2026. Already have{' '}
+            {input.ownedPickets}. The list prices only the rest. Driven 800 mm, 1.0 m above ground.
+          </p>
+        ) : input.postType === 'star' && input.picketLength === 1.8 && input.ownedPickets > 0 ? (
           <p className="hint">
             {price('star-1.8').label}, {formatAud(price('star-1.8').aud)} each. Southern Farm Supplies, Bega, 20 Nov
             2026. Already have {input.ownedPickets}. The list prices only the rest.
@@ -464,22 +470,49 @@ export function Controls({
 
       <section>
         <h2>Hoops + net</h2>
+        {input.design === 'v2' ? (
+          <label className="select">
+            Cover
+            <select
+              value={input.cover}
+              onChange={(e) => {
+                const cover = e.target.value as CoverOption
+                patch({
+                  cover,
+                  hoopSpacing: cover === 'shade-30' ? 1.25 : input.length / 7,
+                })
+              }}
+            >
+              <option value="bird-net">5 mm bird net</option>
+              <option value="shade-30">30% shade cloth</option>
+            </select>
+          </label>
+        ) : null}
         <Slider label="Hoop spacing" field="hoopSpacing" input={input} patch={patch} />
-        <label className="select">
-          Pipe starts
-          <select
-            value={input.hoopOrigin}
-            onChange={(e) => patch({ hoopOrigin: e.target.value as HoopOrigin })}
-          >
-            <option value="ground">Sleeved over the picket tops</option>
-            <option value="rail">Saddle-clipped to a top rail</option>
-          </select>
-        </label>
-        <Slider label="Sleeve on picket" field="pipeInsert" input={input} patch={patch} />
-        <p className="hint">
-          Pipe slides {(input.pipeInsert * 1000).toFixed(0)} mm over the picket top and stays vertical there.
-          The wire must stop at the bottom of that sleeve.
-        </p>
+        {input.design === 'v2' ? (
+          <p className="hint">
+            Bird net: 8 hoops at about 1.43 m. Shade cloth: 9 hoops at 1.25 m. The hoop is a 1.0 m vertical leg,
+            poly sleeved to the ground, then a semi-ellipse. Seven 40 mm battens. No wires.
+          </p>
+        ) : (
+          <>
+            <label className="select">
+              Pipe starts
+              <select
+                value={input.hoopOrigin}
+                onChange={(e) => patch({ hoopOrigin: e.target.value as HoopOrigin })}
+              >
+                <option value="ground">Sleeved over the picket tops</option>
+                <option value="rail">Saddle-clipped to a top rail</option>
+              </select>
+            </label>
+            <Slider label="Sleeve on picket" field="pipeInsert" input={input} patch={patch} />
+            <p className="hint">
+              Pipe slides {(input.pipeInsert * 1000).toFixed(0)} mm over the picket top and stays vertical there.
+              The wire must stop at the bottom of that sleeve.
+            </p>
+          </>
+        )}
         <label className="select">
           Hoop pipe
           <select
@@ -493,6 +526,7 @@ export function Controls({
             ))}
           </select>
         </label>
+        {input.design === 'v2' ? null : (
         <label className="select">
           Purlins
           <select
@@ -503,7 +537,8 @@ export function Controls({
             <option value="3">Ridge + two side purlins</option>
           </select>
         </label>
-        {input.purlins === 3 ? (
+        )}
+        {input.design !== 'v2' && input.purlins === 3 ? (
           <label className="select">
             Purlin material
             <select

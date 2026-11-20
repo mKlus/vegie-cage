@@ -1,6 +1,7 @@
 import { STAY_COLOUR, type Bracing } from '../lib/bracing'
 import type { CageGeometry } from '../lib/geometry'
 import { formatM, type CageInputs } from '../lib/model'
+import type { V2Frame } from '../lib/v2'
 
 type Props = { input: CageInputs; geo: CageGeometry }
 
@@ -8,7 +9,29 @@ function poly(pts: { x: number; y: number }[], sx: (n: number) => number, sy: (n
   return pts.map((p, i) => `${i === 0 ? 'M' : 'L'}${sx(p.x).toFixed(1)},${sy(p.y).toFixed(1)}`).join(' ')
 }
 
-export function BracingLegend({ scene = false, windward }: { scene?: boolean; windward?: '+x' | '-x' }) {
+export function BracingLegend({
+  scene = false,
+  windward,
+  v2 = false,
+}: {
+  scene?: boolean
+  windward?: '+x' | '-x'
+  v2?: boolean
+}) {
+  if (v2) {
+    return (
+      <ul className={scene ? 'bracing-legend' : 'stay-legend'}>
+        <li>
+          <i style={{ background: STAY_COLOUR.batten }} />
+          Roof battens, headers, end rails
+        </li>
+        <li>
+          <i style={{ background: STAY_COLOUR.diagonal }} />
+          Diagonal batten braces
+        </li>
+      </ul>
+    )
+  }
   return (
     <ul className={scene ? 'bracing-legend' : 'stay-legend'}>
       <li>
@@ -41,6 +64,7 @@ export function BracingLegend({ scene = false, windward }: { scene?: boolean; wi
 }
 
 export function StaysDiagram({ input, geo }: Props) {
+  if (geo.v2) return <V2Sheet input={input} geo={geo} frame={geo.v2} />
   const b = geo.bracing
   const angle = Math.round(b.endGuys[0]?.angleDeg ?? 45)
   return (
@@ -246,6 +270,219 @@ function EndSheet({
         </text>
         <text x={w / 2} y={h - 12} className="d-label" textAnchor="middle">
           Picket {Math.round(embed * 1000)} mm in the ground, {formatM(top)} above. Guy about {angle}°. Anchor {formatM(bracing.endAnchorOutM)} out. Brace foot {formatM(bracing.braceFootM, 1)} along the side.
+        </text>
+      </svg>
+    </figure>
+  )
+}
+
+function V2Sheet({ input, geo, frame }: Props & { frame: V2Frame }) {
+  const shade = frame.cover === 'shade-30'
+  return (
+    <div className="stay-sheet">
+      <p>
+        {frame.diagonals.length} batten diagonals, cut {frame.diagonalCut.toFixed(2)} m (
+        {frame.diagonalLength.toFixed(2)} m bolt to bolt, {frame.diagonalAngle.toFixed(1)}° in the roof surface). Each
+        runs from the low batten on the end hoop up to the lower shoulder on the next hoop.
+        {shade ? ' Shade cloth adds one pair in bay 4.' : ''} Seven longitudinal battens, two end headers, end low
+        rails. No wires, Gripples, struts, or outside guys. Same colours as the 3D view.
+      </p>
+      <h3>Plan</h3>
+      <V2Plan input={input} geo={geo} frame={frame} />
+      <h3>Side</h3>
+      <V2Side input={input} geo={geo} frame={frame} />
+      <h3>Door end</h3>
+      <V2End input={input} geo={geo} frame={frame} />
+      <BracingLegend v2 />
+    </div>
+  )
+}
+
+function V2Plan({ input, geo, frame }: Props & { frame: V2Frame }) {
+  const pad = 36
+  const w = 720
+  const h = 420
+  const halfL = input.length / 2
+  const halfW = input.width / 2
+  const zMin = -halfL - 0.8
+  const zMax = halfL + 0.6
+  const xMin = -halfW - 0.7
+  const xMax = halfW + 0.55
+  const s = Math.min((w - pad * 2) / (zMax - zMin), (h - pad * 2) / (xMax - xMin))
+  const sx = (z: number) => pad + (z - zMin) * s
+  const sy = (x: number) => pad + (xMax - x) * s
+  return (
+    <figure>
+      <figcaption>
+        Top — door on the near end, opening outward. Diagonals run from the wall line into the next hoop.
+      </figcaption>
+      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Stays and bracing plan">
+        <rect x={sx(-halfL)} y={sy(halfW)} width={input.length * s} height={input.width * s} className="d-outline" />
+        {geo.hoopZs.map((z) => (
+          <line key={z} x1={sx(z)} y1={sy(-halfW)} x2={sx(z)} y2={sy(halfW)} className="d-hoop" />
+        ))}
+        {frame.battens.map((m) => (
+          <line key={m.name} x1={sx(m.from.z)} y1={sy(m.from.x)} x2={sx(m.to.z)} y2={sy(m.to.x)} className="d-batten" />
+        ))}
+        {frame.headers.map((m) => (
+          <line key={m.name} x1={sx(m.from.z)} y1={sy(m.from.x)} x2={sx(m.to.z)} y2={sy(m.to.x)} className="d-batten" />
+        ))}
+        {frame.diagonals.map((m) => (
+          <line key={m.name} x1={sx(m.from.z)} y1={sy(m.from.x)} x2={sx(m.to.z)} y2={sy(m.to.x)} className="d-brace" />
+        ))}
+        {frame.endPosts.map((p, i) => (
+          <rect key={`p-${i}`} x={sx(p.z) - 3.5} y={sy(p.x) - 3.5} width={7} height={7} className="d-door-post" />
+        ))}
+        <line
+          x1={sx(-halfL)}
+          y1={sy(input.doorWidth / 2)}
+          x2={sx(-halfL)}
+          y2={sy(-input.doorWidth / 2)}
+          className="d-door-mark"
+        />
+        <text x={sx(-halfL - 0.15)} y={sy(0)} className="d-dim" textAnchor="end">
+          Door, opens out
+        </text>
+        <text x={sx(0)} y={h - 12} className="d-label" textAnchor="middle">
+          {formatM(input.length, 1)} × {formatM(input.width, 1)} centres · {geo.hoopCount} hoops @{' '}
+          {formatM(geo.actualSpacing, 2)} · {frame.diagonals.length} diagonals cut {frame.diagonalCut.toFixed(2)} m
+        </text>
+      </svg>
+    </figure>
+  )
+}
+
+function V2Side({ input, geo, frame }: Props & { frame: V2Frame }) {
+  const w = 720
+  const h = 380
+  const halfL = input.length / 2
+  const plot = fit(
+    { x0: -halfL - 0.45, x1: halfL + 0.45, y0: -0.35, y1: geo.peakY + 0.4 },
+    { x: 36, y: 24, w: w - 72, h: h - 68 },
+  )
+  const heights = [...new Set(frame.battens.map((m) => m.from.y))]
+  const side = frame.diagonals.filter((m) => m.from.x > 0)
+  return (
+    <figure>
+      <figcaption>
+        Side — one wall. Diagonals climb from {formatM(frame.lowY, 2)} on the end hoop to {formatM(frame.lowerY, 2)} on
+        the next hoop. Both sides are the same.
+      </figcaption>
+      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Side elevation of battens and diagonal braces">
+        <line x1={plot.sx(-halfL)} y1={plot.sy(0)} x2={plot.sx(halfL)} y2={plot.sy(0)} className="d-ground" />
+        {geo.hoopZs.map((z) => (
+          <line key={z} x1={plot.sx(z)} y1={plot.sy(0)} x2={plot.sx(z)} y2={plot.sy(geo.peakY)} className="d-hoop" />
+        ))}
+        {heights.map((y) => (
+          <line key={y} x1={plot.sx(-halfL)} y1={plot.sy(y)} x2={plot.sx(halfL)} y2={plot.sy(y)} className="d-batten" />
+        ))}
+        {side.map((m) => (
+          <line
+            key={m.name}
+            x1={plot.sx(m.from.z)}
+            y1={plot.sy(m.from.y)}
+            x2={plot.sx(m.to.z)}
+            y2={plot.sy(m.to.y)}
+            className="d-brace"
+          />
+        ))}
+        <text x={w / 2} y={h - 14} className="d-label" textAnchor="middle">
+          {frame.diagonals.length} diagonals · cut {frame.diagonalCut.toFixed(2)} m · {frame.diagonalAngle.toFixed(1)}°
+          in the roof surface · lap {formatM(frame.lapFrom, 2)}–{formatM(frame.lapTo, 2)}
+        </text>
+      </svg>
+    </figure>
+  )
+}
+
+function V2End({ input, geo, frame }: Props & { frame: V2Frame }) {
+  const w = 720
+  const h = 420
+  const halfW = input.width / 2
+  const embed = geo.embedDepth
+  const plot = fit(
+    { x0: -halfW - 0.55, x1: halfW + 0.55, y0: -embed - 0.35, y1: geo.peakY + 0.35 },
+    { x: 28, y: 28, w: w - 56, h: h - 70 },
+  )
+  const doorZ = -input.length / 2
+  const unit = plot.sx(1) - plot.sx(0)
+  const rails = frame.rails.filter((m) => Math.abs(m.from.z - doorZ) < 1e-6)
+  return (
+    <figure>
+      <figcaption>
+        Door end — header at {formatM(frame.headerY, 2)}, seven batten positions, low rails beside the gate
+      </figcaption>
+      <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="End elevation of battens and bracing">
+        <line x1={plot.sx(-halfW - 0.3)} y1={plot.sy(0)} x2={plot.sx(halfW + 0.3)} y2={plot.sy(0)} className="d-ground" />
+        <path d={poly(geo.hoopPoints, plot.sx, plot.sy)} className="d-hoop" />
+        {([-1, 1] as const).map((side) => (
+          <line
+            key={side}
+            x1={plot.sx(side * halfW)}
+            y1={plot.sy(-embed)}
+            x2={plot.sx(side * halfW)}
+            y2={plot.sy(geo.stickUp)}
+            className="d-post"
+          />
+        ))}
+        {frame.endPosts
+          .filter((p) => Math.abs(p.z - doorZ) < 1e-6)
+          .map((p) => (
+            <line
+              key={`${p.x}`}
+              x1={plot.sx(p.x)}
+              y1={plot.sy(-p.embed)}
+              x2={plot.sx(p.x)}
+              y2={plot.sy(p.top)}
+              className="d-door-post"
+            />
+          ))}
+        <line
+          x1={plot.sx(-frame.headerHalf)}
+          y1={plot.sy(frame.headerY)}
+          x2={plot.sx(frame.headerHalf)}
+          y2={plot.sy(frame.headerY)}
+          className="d-batten"
+        />
+        {rails.map((m) => (
+          <line
+            key={m.name}
+            x1={plot.sx(m.from.x)}
+            y1={plot.sy(m.from.y)}
+            x2={plot.sx(m.to.x)}
+            y2={plot.sy(m.to.y)}
+            className="d-batten"
+          />
+        ))}
+        {frame.battens.map((m) => (
+          <circle key={m.name} cx={plot.sx(m.from.x)} cy={plot.sy(m.from.y)} r={4.5} className="d-batten-dot" />
+        ))}
+        <rect
+          x={plot.sx(-halfW)}
+          y={plot.sy(geo.meshBand.top)}
+          width={(halfW - input.doorWidth / 2) * unit}
+          height={(geo.meshBand.top - geo.meshBand.bottom) * (plot.sy(0) - plot.sy(1))}
+          className="d-mesh"
+        />
+        <rect
+          x={plot.sx(input.doorWidth / 2)}
+          y={plot.sy(geo.meshBand.top)}
+          width={(halfW - input.doorWidth / 2) * unit}
+          height={(geo.meshBand.top - geo.meshBand.bottom) * (plot.sy(0) - plot.sy(1))}
+          className="d-mesh"
+        />
+        <rect
+          x={plot.sx(-input.doorWidth / 2)}
+          y={plot.sy(0.07 + input.doorHeight)}
+          width={input.doorWidth * unit}
+          height={input.doorHeight * (plot.sy(0) - plot.sy(1))}
+          className="d-door-mesh"
+        />
+        <text x={plot.sx(0)} y={plot.sy(-embed - 0.12)} className="d-dim" textAnchor="middle">
+          Gate {formatM(input.doorWidth, 1)} × {formatM(input.doorHeight, 1)}, opens outward · posts 550 mm in concrete
+        </text>
+        <text x={w / 2} y={h - 14} className="d-label" textAnchor="middle">
+          Peak {formatM(geo.peakY, 2)} · sleeve to the ground · mesh band 0.05–0.95 m · header {formatM(frame.headerHalf * 2, 2)}
         </text>
       </svg>
     </figure>

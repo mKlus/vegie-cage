@@ -84,6 +84,15 @@ function main(): void {
   if (flags.mesh === 'hex50' || flags.mesh === 'hex40' || flags.mesh === 'hex25' || flags.mesh === 'weld25' || flags.mesh === 'weld12') {
     raw = { ...raw, wallMesh: flags.mesh }
   }
+  if (flags.design === 'classic' || flags.design === 'v2') raw = { ...raw, design: flags.design }
+  if (flags.cover === 'bird-net' || flags.cover === 'shade-30') {
+    const cover = flags.cover
+    const design = raw.design === 'classic' ? 'classic' : 'v2'
+    raw = { ...raw, cover }
+    if (design === 'v2' && typeof flags.spacing !== 'string') {
+      raw = { ...raw, hoopSpacing: cover === 'shade-30' ? 1.25 : 10 / 7 }
+    }
+  }
 
   const result = computeCage(raw)
   if (flags.guide === true) {

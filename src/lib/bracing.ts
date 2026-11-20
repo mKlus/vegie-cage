@@ -27,6 +27,9 @@ export const STAY_COLOUR = {
   anchor: '#ffd84a',
   purlin: '#f3e7a1',
   ridge: '#b7e38a',
+  /** v2: roof battens in blue, diagonal batten braces in red. */
+  batten: '#3aa0ff',
+  diagonal: '#ff2d3a',
 } as const
 
 export type Vec3 = { x: number; y: number; z: number }
@@ -153,6 +156,24 @@ function makeGuy(kind: Guy['kind'], from: Vec3, to: Vec3): Guy {
     to,
     lengthM: round2(Math.hypot(horizontal, dy)),
     angleDeg: (Math.atan2(Math.abs(dy), horizontal) * 180) / Math.PI,
+  }
+}
+
+export function emptyBracing(): Bracing {
+  return {
+    windward: '+x',
+    endAnchorOutM: 0,
+    sideAnchorOutM: 0,
+    braceFootM: 0,
+    endGuys: [],
+    sideGuys: [],
+    braces: [],
+    anchorCount: 0,
+    guyCount: 0,
+    braceCount: 0,
+    strainerCount: 0,
+    braceClipCount: 0,
+    guyWireM: 0,
   }
 }
 

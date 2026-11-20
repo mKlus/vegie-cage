@@ -12,7 +12,7 @@ export type CageResult = {
   guide: Step[]
 }
 
-/** Pure cut-list and build guide. Accepts a partial input and fills the Marek 5×10 defaults. */
+/** Pure cut-list and build guide. Accepts a partial input and fills the Marek 4.6×10 defaults. */
 export function computeCage(raw: Partial<CageInputs> = {}): CageResult {
   const inputs = sanitise(raw)
   const bom = buildBom(inputs)

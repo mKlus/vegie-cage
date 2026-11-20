@@ -1,7 +1,8 @@
-import { archShoulderPoint, buildArch } from './arch'
+import { archShoulderPoint, buildArch, forcedEllipse } from './arch'
 import { bedBox, bedFootprint, bedInsideCage, boxesOverlap, type PlacedBed } from './birdies'
-import { layoutBracing, type Bracing } from './bracing'
+import { emptyBracing, layoutBracing, type Bracing } from './bracing'
 import { frameHeights, HOOP_MATERIAL, SLEEPER, STAR_ACROSS_MM, WALL_MESH, type CageInputs, round2 } from './model'
+import { layoutV2, meshRunM, shadeClothMetres, V2_HOOP_CUT_M, V2_MESH, V2_NET_BOTTOM, type V2Frame } from './v2'
 import { windCheck, type WindCheck } from './wind'
 
 export type ExtraPost = { x: number; z: number; capped: boolean; role: 'end' | 'jamb' | 'stay' }
@@ -78,8 +79,12 @@ export type CageGeometry = {
   minBendRadius: number
   bendAt: 'shoulder' | 'crown'
   purlinPoints: Point[]
-  /** End guys, windward side guys, diagonal braces, and the anchor/clip counts. */
+  /** End guys, windward side guys, diagonal braces, and the anchor/clip counts. Empty on v2. */
   bracing: Bracing
+  /** Seven battens, headers, end rails, and batten diagonals. Null on a classic frame. */
+  v2: V2Frame | null
+  /** Bottom and top of the wall mesh band. */
+  meshBand: { bottom: number; top: number }
   pickets: PicketTakeoff
   extraPosts: ExtraPost[]
   /** Galvanised round posts for a mesh gate. Empty when the door is a pine leaf on picket jambs. */
@@ -344,6 +349,7 @@ function layoutPickets(input: CageInputs, hoopCount: number): { pickets: PicketT
 }
 
 export function buildGeometry(input: CageInputs): CageGeometry {
+  if (input.design === 'v2') return buildV2Geometry(input)
   const frame = frameHeights(input)
   const insert = input.pipeInsert
   const hoopStartY = frame.stickUp
@@ -464,9 +470,151 @@ export function buildGeometry(input: CageInputs): CageGeometry {
       hoopZs,
       doorWall: input.doorWall,
     }),
+    v2: null,
+    meshBand: { bottom: 0, top: input.meshHeight },
     pickets: posts.pickets,
     extraPosts: posts.extraPosts,
     doorPosts: layoutDoorPosts(input),
+    net,
+    wind,
+  }
+}
+
+function buildV2Geometry(input: CageInputs): CageGeometry {
+  const frame = frameHeights(input)
+  const leg = frame.stickUp
+  const span = input.width
+  const rise = Math.max(0.15, input.peakHeight - leg)
+  const arch = forcedEllipse(span, rise, leg)
+  const peakY = leg + arch.rise
+  const hoopPoints: Point[] = [
+    { x: -span / 2, y: 0 },
+    ...arch.points,
+    { x: span / 2, y: 0 },
+  ]
+  const standardHoop =
+    Math.abs(span - 4.6) < 1e-6 && Math.abs(input.peakHeight - 2.5) < 1e-6 && Math.abs(leg - 1) < 1e-6
+  const pipeEachM = standardHoop ? V2_HOOP_CUT_M : round2(arch.arcLength + 2 * leg)
+  const meshBottom = V2_MESH.bottom
+  const meshTop = round2(meshBottom + input.meshHeight)
+  const netBottom = Math.abs(input.meshHeight - V2_MESH.height) < 1e-6 ? V2_NET_BOTTOM : round2(meshTop - NET_OVERLAP_M)
+  const netPoints: Point[] = [
+    { x: -span / 2, y: netBottom },
+    ...arch.points,
+    { x: span / 2, y: netBottom },
+  ]
+  const hoopZs = hoopStations(input.length, input.hoopSpacing)
+  const hoopCount = hoopZs.length
+  const actualSpacing = hoopCount > 1 ? input.length / (hoopCount - 1) : input.length
+  const v2 = layoutV2({
+    length: input.length,
+    width: input.width,
+    peak: peakY,
+    leg,
+    hoopZs,
+    cover: input.cover,
+    doorWidth: input.doorWidth,
+  })
+  const beds = layoutBeds(input)
+  const perimeterM = 2 * (input.length + input.width)
+  const meshRun = meshRunM(input.length, input.width, input.doorWidth)
+  const door =
+    input.doorWall === 'side'
+      ? {
+          wall: 'side' as const,
+          x0: input.width / 2,
+          x1: input.width / 2,
+          z: 0,
+          width: input.doorWidth,
+          height: input.doorHeight,
+        }
+      : {
+          wall: 'end' as const,
+          x0: -input.doorWidth / 2,
+          x1: input.doorWidth / 2,
+          z: -input.length / 2,
+          width: input.doorWidth,
+          height: input.doorHeight,
+        }
+  const endArea = input.cover === 'shade-30' ? round2(2 * input.width * 1.8) : round2(2 * 4.75 * 1.8)
+  const net: NetTakeoff =
+    input.cover === 'shade-30'
+      ? {
+          roofWidthM: 7.32,
+          roofLengthM: round2(input.length + 0.3),
+          roofAreaM2: round2(7.32 * (input.length + 0.3)),
+          endAreaM2: endArea,
+          usedM2: round2(shadeClothMetres(input.length, input.width) * 3.66),
+          stockW: 3.66,
+          stockL: 20,
+          pieces: Math.max(1, Math.ceil(shadeClothMetres(input.length, input.width) / 20 - 1e-9)),
+          buy: `${Math.max(1, Math.ceil(shadeClothMetres(input.length, input.width) / 20 - 1e-9))} × 3.66 × 20 m`,
+        }
+      : {
+          roofWidthM: 6.7,
+          roofLengthM: input.length,
+          roofAreaM2: round2(6.7 * input.length),
+          endAreaM2: endArea,
+          usedM2: round2(6.7 * input.length + endArea),
+          stockW: 10,
+          stockL: 10,
+          pieces: 1,
+          buy: '1 × 10 × 10 m',
+        }
+  const wind = windCheck({
+    gustMs: input.windGust,
+    spacing: actualSpacing,
+    wireHeight: input.meshHeight,
+    peakY,
+    shoulderY: leg,
+    stickUp: leg,
+    embedDepth: input.embedDepth,
+    postType: input.postType,
+  })
+  const hoopN = hoopCount * 2
+  return {
+    span,
+    rise: round2(arch.rise),
+    radius: round2(arch.minBendRadius),
+    halfAngle: Math.PI / 2,
+    cy: 0,
+    hoopStartY: leg,
+    hoopArcM: round2(arch.arcLength),
+    netArcM: round2(arch.arcLength + 2 * Math.max(0, leg - netBottom)),
+    hoopCount,
+    hoopZs,
+    actualSpacing: round2(actualSpacing),
+    pipeEachM,
+    pipeInsertM: leg,
+    hoopPoints,
+    netPoints,
+    beds: beds.beds,
+    bedLength: round2(beds.bedLength),
+    sideGap: round2(beds.sideGap),
+    bedsFit: beds.fit,
+    bedsNeededW: round2(beds.neededW),
+    door,
+    perimeterM: round2(perimeterM),
+    meshRunM: meshRun,
+    stickUp: leg,
+    embedDepth: input.embedDepth,
+    sleeveTop: leg,
+    sleeveBot: 0,
+    peakY: round2(peakY),
+    archKind: 'ellipse',
+    belowElastica: false,
+    elasticaMinRise: round2(arch.elasticaMinRise),
+    minBendRadius: round2(arch.minBendRadius),
+    bendAt: arch.bendAt,
+    purlinPoints: [],
+    bracing: emptyBracing(),
+    v2,
+    meshBand: { bottom: meshBottom, top: meshTop },
+    pickets: { hoop: hoopN, end: 0, jambs: 0, stays: 0, total: hoopN, caps: 0 },
+    extraPosts: [],
+    doorPosts: v2.endPosts
+      .filter((p) => Math.abs(p.z + input.length / 2) < 1e-6)
+      .map((p) => ({ x: p.x, z: p.z })),
     net,
     wind,
   }
@@ -486,7 +634,7 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
     })
   }
 
-  if (input.meshHeight > geo.sleeveBot + 0.001) {
+  if (input.design !== 'v2' && input.meshHeight > geo.sleeveBot + 0.001) {
     out.push({
       level: 'bad',
       text: `Wire top ${input.meshHeight.toFixed(2)} m enters the sleeve (${geo.sleeveBot.toFixed(2)}–${geo.sleeveTop.toFixed(2)} m). Stop the wire at the bottom of the sleeve so the pipe does not cover the mesh.`,
@@ -507,7 +655,8 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
     })
   }
 
-  if (geo.minBendRadius < hoop.minBendM) {
+  const bendFloor = input.design === 'v2' ? hoop.minBendM * 0.95 : hoop.minBendM
+  if (geo.minBendRadius < bendFloor) {
     out.push({
       level: geo.minBendRadius < hoop.minBendM * 0.85 ? 'bad' : 'warn',
       text: `Tightest bend is ${geo.minBendRadius.toFixed(2)} m at the ${geo.bendAt}, under the ~${hoop.minBendM.toFixed(2)} m cold-bend guide for this pipe. Raise the peak or narrow the span so it does not kink.`,
@@ -523,7 +672,7 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
   } else if (riseRatio < 0.3) {
     out.push({
       level: 'warn',
-      text: 'Shallow arch. Keep the ridge and two purlins, and do not skip the end guys.',
+      text: 'Shallow arch. Keep the longitudinals, and do not skip the bracing.',
     })
   }
 
@@ -549,7 +698,19 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
     })
   }
 
-  if (input.hoopSpacing > 1.2) {
+  if (input.design === 'v2') {
+    if (input.cover === 'shade-30' && geo.actualSpacing > 1.3) {
+      out.push({
+        level: 'warn',
+        text: 'Hoop spacing over 1.2 m with shade cloth. This cover wants 9 hoops at 1.25 m.',
+      })
+    } else if (geo.actualSpacing > 1.2) {
+      out.push({
+        level: 'info',
+        text: 'Hoop spacing over 1.2 m is the bird-net choice (about 1.43 m). Shade cloth on this frame wants 9 hoops at 1.25 m.',
+      })
+    }
+  } else if (input.hoopSpacing > 1.2) {
     out.push({
       level: 'warn',
       text: 'Hoop spacing over 1.2 m: the net sags between hoops and a possum can walk it. 1.0 m holds it tighter; 0.8 m on a windy site.',
@@ -581,6 +742,17 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
     out.push({
       level: 'info',
       text: 'Door under 0.9 m: wheelbarrow and sleeper lengths will not pass. 1.0 m is the floor for a working garden.',
+    })
+  }
+
+  if (input.design === 'v2') {
+    out.push({
+      level: 'info',
+      text: 'Check that 50 mm rural poly (about 60 mm OD) slides over a MaxY before buying the 100 m roll.',
+    })
+    out.push({
+      level: 'warn',
+      text: 'Hand calculations, not certified engineering. Soil is the unknown: test-pull one MaxY before driving the rest.',
     })
   }
 
@@ -617,7 +789,7 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
     })
   }
 
-  if (input.purlins === 1 && input.width >= 4) {
+  if (input.design !== 'v2' && input.purlins === 1 && input.width >= 4) {
     out.push({
       level: 'warn',
       text: `A ${input.width.toFixed(1)} m span is a sail. Ridge-only is not enough — add two side purlins.`,

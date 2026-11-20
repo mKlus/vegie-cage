@@ -76,30 +76,43 @@ function EndElevation({ input, geo }: DiagramsProps) {
         <path d={hoop} className="d-hoop" />
         <rect
           x={sx(-input.width / 2)}
-          y={sy(input.meshHeight)}
+          y={sy(geo.meshBand.top)}
           width={input.width * s}
-          height={input.meshHeight * s}
+          height={(geo.meshBand.top - geo.meshBand.bottom) * s}
           className="d-mesh"
         />
         <rect
           x={sx(-input.doorWidth / 2)}
-          y={sy(input.doorHeight)}
+          y={sy((geo.v2 ? 0.07 : 0) + input.doorHeight)}
           width={input.doorWidth * s}
           height={input.doorHeight * s}
           className={input.doorStyle === 'mesh-gate' ? 'd-door-mesh' : 'd-door'}
         />
-        {input.doorStyle === 'mesh-gate' && input.doorWall === 'end'
-          ? ([-1, 1] as const).map((side) => (
-              <line
-                key={side}
-                x1={sx((side * input.doorWidth) / 2)}
-                y1={sy(-MESH_GATE.embedM)}
-                x2={sx((side * input.doorWidth) / 2)}
-                y2={sy(MESH_GATE.postLengthM - MESH_GATE.embedM)}
-                className="d-door-post"
-              />
-            ))
-          : null}
+        {geo.v2
+          ? geo.v2.endPosts
+              .filter((p) => Math.abs(p.z + input.length / 2) < 1e-3)
+              .map((p) => (
+                <line
+                  key={p.x}
+                  x1={sx(p.x)}
+                  y1={sy(-p.embed)}
+                  x2={sx(p.x)}
+                  y2={sy(p.top)}
+                  className="d-door-post"
+                />
+              ))
+          : input.doorStyle === 'mesh-gate' && input.doorWall === 'end'
+            ? ([-1, 1] as const).map((side) => (
+                <line
+                  key={side}
+                  x1={sx((side * input.doorWidth) / 2)}
+                  y1={sy(-MESH_GATE.embedM)}
+                  x2={sx((side * input.doorWidth) / 2)}
+                  y2={sy(MESH_GATE.postLengthM - MESH_GATE.embedM)}
+                  className="d-door-post"
+                />
+              ))
+            : null}
         <path
           d={`M ${sx(-input.doorWidth / 2)} ${sy(0)} A ${input.doorWidth * s} ${input.doorWidth * s} 0 0 0 ${sx(-input.doorWidth / 2)} ${sy(0) + 8}`}
           className="d-swing"
@@ -135,15 +148,28 @@ function SideElevation({ input, geo }: DiagramsProps) {
         ) : null}
         <rect
           x={sx(-input.length / 2)}
-          y={sy(input.meshHeight)}
+          y={sy(geo.meshBand.top)}
           width={input.length * s}
-          height={input.meshHeight * s}
+          height={(geo.meshBand.top - geo.meshBand.bottom) * s}
           className="d-mesh"
         />
-        <path
-          d={`M${sx(-input.length / 2 - RIDGE_PAST_END_M)} ${sy(geo.peakY)} L${sx(input.length / 2 + RIDGE_PAST_END_M)} ${sy(geo.peakY)}`}
-          className="d-hoop"
-        />
+        {geo.v2 ? (
+          [...new Set(geo.v2.battens.map((m) => m.from.y))].map((y) => (
+            <line
+              key={y}
+              x1={sx(-input.length / 2)}
+              y1={sy(y)}
+              x2={sx(input.length / 2)}
+              y2={sy(y)}
+              className="d-batten"
+            />
+          ))
+        ) : (
+          <path
+            d={`M${sx(-input.length / 2 - RIDGE_PAST_END_M)} ${sy(geo.peakY)} L${sx(input.length / 2 + RIDGE_PAST_END_M)} ${sy(geo.peakY)}`}
+            className="d-hoop"
+          />
+        )}
         {geo.hoopZs.map((z, i) => (
           <line
             key={i}

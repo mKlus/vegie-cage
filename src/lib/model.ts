@@ -21,6 +21,10 @@ export type DoorStyle = 'timber' | 'mesh-gate'
 export type PurlinSet = 1 | 3
 export type PurlinMaterial = 'pipe' | 'wire'
 export type SkirtMode = 'buried-vertical' | 'l-outward' | 'none'
+/** `v2` is the seven-batten tunnel. `classic` keeps guys, a ridge pipe, and purlin wires. */
+export type FrameDesign = 'classic' | 'v2'
+/** Bird net is the default cover. Shade cloth uses one more hoop. */
+export type CoverOption = 'bird-net' | 'shade-30'
 
 /** 200×50 H4 on edge. The 200 mm face is vertical: 150 mm in the trench, 50 mm above ground. */
 export const SLEEPER = {
@@ -85,25 +89,27 @@ export type CageInputs = {
   pipeInsert: number
   /** Design gust for the rough wind check, m/s. Not an engineering input. */
   windGust: number
+  design: FrameDesign
+  cover: CoverOption
   beds: PlacedBed[]
 }
 
 export const DEFAULTS: CageInputs = {
   length: 10,
-  width: 5,
-  meshHeight: 1,
-  peakHeight: 3,
-  hoopSpacing: 1.25,
+  width: 4.6,
+  meshHeight: 0.9,
+  peakHeight: 2.5,
+  hoopSpacing: 10 / 7,
   hoopOrigin: 'ground',
   hoopMaterial: 'poly50',
-  wallMesh: 'hex50',
+  wallMesh: 'weld25',
   postType: 'star',
-  netType: 'wildlife5',
+  netType: 'bird5',
   purlins: 3,
   purlinMaterial: 'wire',
   doorWall: 'end',
   doorWidth: 1,
-  doorHeight: 2,
+  doorHeight: 1.8,
   doorStyle: 'mesh-gate',
   ownedPickets: 4,
   tomatoTrellis: true,
@@ -111,38 +117,40 @@ export const DEFAULTS: CageInputs = {
   skirtDepth: 0.25,
   sleeperBase: true,
   picketLength: 1.8,
-  embedDepth: 0.6,
+  embedDepth: 0.8,
   aisleWork: DEFAULT_AISLE_WORK,
   aisleWalk: DEFAULT_AISLE_WALK,
   aisleDoor: DEFAULT_AISLE_DOOR,
   aisleWallLong: DEFAULT_AISLE_WALL_LONG,
   aisleWallShort: DEFAULT_AISLE_WALL_SHORT,
-  pipeInsert: 0.2,
+  pipeInsert: 1,
   windGust: 40,
-  beds: packOwnedFour(10, 5),
+  design: 'v2',
+  cover: 'bird-net',
+  beds: packOwnedFour(10, 4.6),
 }
 
 export const PRESETS: { id: string; label: string; note: string; patch: Partial<CageInputs> }[] = [
   {
     id: 'marek-5x10',
-    label: 'Marek 5×10',
-    note: '10 × 5 m, peak 3.0 m. 9 hoops at 1.25 m. Galvanised Waratah Galstar Maxy 1.8 m pickets driven 600 mm (4 already bought). 1.0 m wire from ground level, sleeve 1.0–1.2 m, one 50 mm poly ridge, two 2.5 mm purlin wires, no skirt, 200×50 sleeper 150 mm in / 50 mm up. Mesh gate on two concreted 50–65 mm posts. Tomato trellis (2 Ultraposts + 10 m dog fence) already bought, inside the cage.',
+    label: 'Marek 4.6×10',
+    note: '10 m × 4.6 m picket centres, peak 2.5 m. Bird net: 8 hoops at 1.43 m (shade cloth: 9 at 1.25 m). Galstar MaxY 1.8 m driven 800 mm, poly sleeved to the ground, cut 8.1 m. Seven 40 mm roof battens and end-bay batten diagonals. No wires, Gripples, struts, or outside guys. 900 mm welded mesh, no apron. 4 concreted 50×50 SHS posts, 1.0 × 1.8 m gate opening outward. Tomato trellis already bought, inside the cage.',
     patch: {
       length: 10,
-      width: 5,
-      meshHeight: 1,
-      peakHeight: 3,
-      hoopSpacing: 1.25,
+      width: 4.6,
+      meshHeight: 0.9,
+      peakHeight: 2.5,
+      hoopSpacing: 10 / 7,
       hoopOrigin: 'ground',
       hoopMaterial: 'poly50',
-      wallMesh: 'hex50',
+      wallMesh: 'weld25',
       postType: 'star',
-      netType: 'wildlife5',
+      netType: 'bird5',
       purlins: 3,
       purlinMaterial: 'wire',
       doorWall: 'end',
       doorWidth: 1,
-      doorHeight: 2,
+      doorHeight: 1.8,
       doorStyle: 'mesh-gate',
       ownedPickets: 4,
       tomatoTrellis: true,
@@ -150,10 +158,12 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       skirtDepth: 0.25,
       sleeperBase: true,
       picketLength: 1.8,
-      embedDepth: 0.6,
-      pipeInsert: 0.2,
+      embedDepth: 0.8,
+      pipeInsert: 1,
       windGust: 40,
-      beds: packOwnedFour(10, 5),
+      design: 'v2',
+      cover: 'bird-net',
+      beds: packOwnedFour(10, 4.6),
     },
   },
   {
@@ -169,9 +179,11 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       hoopMaterial: 'poly50',
       wallMesh: 'weld25',
       postType: 'star',
+      netType: 'wildlife5',
       purlins: 3,
       purlinMaterial: 'wire',
       doorStyle: 'timber',
+      doorHeight: 2,
       ownedPickets: 0,
       tomatoTrellis: false,
       picketLength: 2.1,
@@ -180,6 +192,7 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       sleeperBase: true,
       skirtMode: 'buried-vertical',
       skirtDepth: 0.25,
+      design: 'classic',
       beds: packOwnedFour(12, 6),
     },
   },
@@ -197,9 +210,12 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       embedDepth: 0.7,
       pipeInsert: 0.2,
       wallMesh: 'weld25',
+      netType: 'wildlife5',
       doorStyle: 'timber',
+      doorHeight: 2,
       ownedPickets: 0,
       tomatoTrellis: false,
+      design: 'classic',
       beds: packOwnedFour(10, 6),
     },
   },
@@ -217,9 +233,12 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       embedDepth: 0.7,
       pipeInsert: 0.2,
       wallMesh: 'weld25',
+      netType: 'wildlife5',
       doorStyle: 'timber',
+      doorHeight: 2,
       ownedPickets: 0,
       tomatoTrellis: false,
+      design: 'classic',
       beds: packOwnedFour(14, 6),
     },
   },
@@ -244,10 +263,12 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       tomatoTrellis: false,
       purlins: 1,
       purlinMaterial: 'pipe',
+      netType: 'wildlife5',
       picketLength: 1.65,
       embedDepth: 0.7,
       pipeInsert: 0.15,
       sleeperBase: false,
+      design: 'classic',
       skirtMode: 'l-outward',
       skirtDepth: 0.2,
       windGust: 30,
@@ -285,7 +306,7 @@ export const LIMITS = {
   aisleDoor: { min: 0.4, max: 1.5, step: 0.05 },
   aisleWallLong: { min: 0.4, max: 1.5, step: 0.05 },
   aisleWallShort: { min: 0.4, max: 1.2, step: 0.05 },
-  pipeInsert: { min: 0.08, max: 0.35, step: 0.01 },
+  pipeInsert: { min: 0.08, max: 1.2, step: 0.01 },
 } as const
 
 export function clamp(n: number, min: number, max: number): number {
@@ -387,6 +408,8 @@ export function sanitise(raw: LegacyInputs): CageInputs {
     netType: src.netType === 'bird5' ? 'bird5' : 'wildlife5',
     purlins: src.purlins === 1 ? 1 : 3,
     purlinMaterial: src.purlinMaterial === 'pipe' ? 'pipe' : 'wire',
+    design: src.design === 'classic' ? 'classic' : 'v2',
+    cover: src.cover === 'shade-30' ? 'shade-30' : 'bird-net',
     doorWall: src.doorWall === 'side' ? 'side' : 'end',
     doorWidth,
     doorHeight,

@@ -64,7 +64,7 @@ export function windCheck(opts: {
     `One side picket: overturning ${momentNm.toFixed(0)} N·m against a rough embed capacity of ${capacityNm.toFixed(0)} N·m`,
     `(passive soil on ${d.toFixed(2)} m embed; guys, sleeper, and arch sharing not counted).`,
     over
-      ? `Over the rough capacity. Drive deeper, keep the end guys, or treat ${opts.gustMs.toFixed(0)} m/s as a storm this embed may not hold.`
+      ? `Over the rough capacity. Drive deeper, keep the bracing, or treat ${opts.gustMs.toFixed(0)} m/s as a storm this embed may not hold.`
       : `Under the rough capacity at this gust.`,
   ].join(' ')
   return {

@@ -169,8 +169,8 @@ export default function App() {
           </div>
         </div>
         <p className="lede">
-          Star pickets, chicken wire, poly hoops, taut net, mesh gate. Marek 5×10 is the default. Place Birdies
-          beds on the Plan, then read the cut list. The address bar is the share link.
+          MaxY pickets, poly hoops, roof battens, welded mesh, taut net, mesh gate. Marek 4.6×10 is the
+          default. Place Birdies beds on the Plan, then read the cut list. The address bar is the share link.
         </p>
         <div className="mast-tools">
           <ThemeSwitch value={themePref} onChange={setThemePref} />
@@ -199,7 +199,7 @@ export default function App() {
         <aside className="console">
           <div className="console-tools">
             <button type="button" onClick={() => patch(DEFAULTS)}>
-              Reset Marek 5×10
+              Reset Marek 4.6×10
             </button>
             <button
               type="button"
@@ -339,7 +339,9 @@ export default function App() {
                   selectedId={selectedId}
                   onSelect={setSelectedId}
                 />
-                {showBracing ? <BracingLegend scene windward={geo.bracing.windward} /> : null}
+                {showBracing ? (
+                  <BracingLegend scene windward={geo.bracing.windward} v2={geo.v2 !== null} />
+                ) : null}
               </>
             )}
           </div>

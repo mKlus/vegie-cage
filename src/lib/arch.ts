@@ -175,6 +175,14 @@ function ellipse(span: number, rise: number, shoulderY: number, belowElastica: b
   }
 }
 
+/** Semi-ellipse with a vertical tangent at each shoulder. Used by the v2 hoop. */
+export function forcedEllipse(span: number, rise: number, shoulderY: number): ArchShape {
+  const safeRise = Math.max(0.15, rise)
+  const safeSpan = Math.max(0.4, span)
+  const minRise = rhoBounds().min * (safeSpan / 2)
+  return ellipse(safeSpan, safeRise, shoulderY, safeRise < minRise - 1e-6)
+}
+
 export function buildArch(span: number, rise: number, shoulderY: number): ArchShape {
   const safeRise = Math.max(0.15, rise)
   const safeSpan = Math.max(0.4, span)

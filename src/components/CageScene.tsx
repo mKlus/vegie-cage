@@ -18,6 +18,7 @@ import {
   Vector3,
 } from 'three'
 import { STAY_COLOUR, type Vec3 } from '../lib/bracing'
+import type { V2Member } from '../lib/v2'
 import type { CageGeometry, Point } from '../lib/geometry'
 
 type ControlsHandle = {
@@ -85,7 +86,7 @@ function tunnelGeometry(points: Point[], z0: number, z1: number): BufferGeometry
 function endWallGeometry(
   hoop: Point[],
   width: number,
-  door: { x0: number; x1: number; height: number } | null,
+  door: { x0: number; x1: number; y0: number; height: number } | null,
 ): ShapeGeometry {
   const shape = new Shape()
   shape.moveTo(-width / 2, 0)
@@ -94,17 +95,17 @@ function endWallGeometry(
   shape.lineTo(-width / 2, 0)
   if (door) {
     const hole = new Path()
-    hole.moveTo(door.x0, 0)
-    hole.lineTo(door.x1, 0)
-    hole.lineTo(door.x1, door.height)
-    hole.lineTo(door.x0, door.height)
+    hole.moveTo(door.x0, door.y0)
+    hole.lineTo(door.x1, door.y0)
+    hole.lineTo(door.x1, door.y0 + door.height)
+    hole.lineTo(door.x0, door.y0 + door.height)
     hole.closePath()
     shape.holes.push(hole)
   }
   return new ShapeGeometry(shape, 8)
 }
 
-function Sleeper({ input }: { input: CageInputs }) {
+function Sleeper({ input, fullRing }: { input: CageInputs; fullRing: boolean }) {
   const t = SLEEPER.thickM
   const h = SLEEPER.faceM
   const y = (SLEEPER.revealM - SLEEPER.buryM) / 2
@@ -123,7 +124,7 @@ function Sleeper({ input }: { input: CageInputs }) {
         <boxGeometry args={[t, h, input.length]} />
         <meshStandardMaterial color={colour} />
       </mesh>
-      {doorOnEnd ? (
+      {doorOnEnd && !fullRing ? (
         <>
           <mesh position={[-(input.doorWidth / 2 + sideW / 2), y, -endZ]}>
             <boxGeometry args={[sideW, h, t]} />
@@ -212,6 +213,14 @@ function braceOutside(p: Vec3): Vec3 {
   return { x: p.x + sign * 0.07, y: p.y, z: p.z }
 }
 
+/** Sit a diagonal just above the battens it screws to. */
+function liftDiagonal(m: V2Member): { from: Vec3; to: Vec3 } {
+  return {
+    from: { ...m.from, y: m.from.y + 0.03 },
+    to: { ...m.to, y: m.to.y + 0.03 },
+  }
+}
+
 function CageModel({
   input,
   geo,
@@ -260,6 +269,7 @@ function CageModel({
       endWallGeometry(geo.hoopPoints, input.width, {
         x0: -input.doorWidth / 2,
         x1: input.doorWidth / 2,
+        y0: geo.v2 ? 0.07 : 0,
         height: input.doorHeight,
       }),
     [geo.hoopPoints, input.width, input.doorWidth, input.doorHeight],
@@ -300,12 +310,26 @@ function CageModel({
   }, [geo.purlinPoints, input.length, input.purlinMaterial, pipeR])
 
   const bracingGeoms = useMemo(() => {
-    if (!showBracing) return { guys: [] as TubeGeometry[], braces: [] as TubeGeometry[] }
+    if (!showBracing || geo.v2) return { guys: [] as TubeGeometry[], braces: [] as TubeGeometry[] }
     return {
       guys: [...geo.bracing.endGuys, ...geo.bracing.sideGuys].map((g) => rodGeometry(g.from, g.to, 0.035)),
       braces: geo.bracing.braces.map((b) => rodGeometry(braceOutside(b.from), braceOutside(b.to), 0.045)),
     }
-  }, [showBracing, geo.bracing])
+  }, [showBracing, geo.bracing, geo.v2])
+
+  const v2Geoms = useMemo(() => {
+    if (!showBracing || !geo.v2) return null
+    const bar = (ends: { from: Vec3; to: Vec3 }, radius: number) => rodGeometry(ends.from, ends.to, radius)
+    return {
+      battens: [...geo.v2.battens, ...geo.v2.headers, ...geo.v2.rails].map((m) => bar(m, 0.016)),
+      diagonals: geo.v2.diagonals.map((m) => bar(liftDiagonal(m), 0.014)),
+    }
+  }, [showBracing, geo.v2])
+
+  const bandBottom = geo.meshBand.bottom
+  const bandH = geo.meshBand.top - geo.meshBand.bottom
+  const bandMid = bandBottom + bandH / 2
+  const gateLift = geo.v2 ? 0.07 : 0
 
   const windSign = geo.bracing.windward === '+x' ? 1 : -1
 
@@ -357,27 +381,27 @@ function CageModel({
             const zDoor = -input.length / 2
             return (
               <>
-                <mesh position={[-(input.doorWidth / 2 + sideW / 2), input.meshHeight / 2, zDoor]}>
-                  <planeGeometry args={[sideW, input.meshHeight]} />
+                <mesh position={[-(input.doorWidth / 2 + sideW / 2), bandMid, zDoor]}>
+                  <planeGeometry args={[sideW, bandH]} />
                   <meshStandardMaterial map={meshTex} transparent opacity={0.72} side={DoubleSide} color="#c5d6a8" />
                 </mesh>
-                <mesh position={[input.doorWidth / 2 + sideW / 2, input.meshHeight / 2, zDoor]}>
-                  <planeGeometry args={[sideW, input.meshHeight]} />
+                <mesh position={[input.doorWidth / 2 + sideW / 2, bandMid, zDoor]}>
+                  <planeGeometry args={[sideW, bandH]} />
                   <meshStandardMaterial map={meshTex} transparent opacity={0.72} side={DoubleSide} color="#c5d6a8" />
                 </mesh>
               </>
             )
           })()}
-          <mesh position={[0, input.meshHeight / 2, input.length / 2]} rotation={[0, Math.PI, 0]}>
-            <planeGeometry args={[input.width, input.meshHeight]} />
+          <mesh position={[0, bandMid, input.length / 2]} rotation={[0, Math.PI, 0]}>
+            <planeGeometry args={[input.width, bandH]} />
             <meshStandardMaterial map={meshTex} transparent opacity={0.72} side={DoubleSide} color="#c5d6a8" />
           </mesh>
-          <mesh position={[-input.width / 2, input.meshHeight / 2, 0]} rotation={[0, Math.PI / 2, 0]}>
-            <planeGeometry args={[input.length, input.meshHeight]} />
+          <mesh position={[-input.width / 2, bandMid, 0]} rotation={[0, Math.PI / 2, 0]}>
+            <planeGeometry args={[input.length, bandH]} />
             <meshStandardMaterial map={meshTex} transparent opacity={0.72} side={DoubleSide} color="#c5d6a8" />
           </mesh>
-          <mesh position={[input.width / 2, input.meshHeight / 2, 0]} rotation={[0, -Math.PI / 2, 0]}>
-            <planeGeometry args={[input.length, input.meshHeight]} />
+          <mesh position={[input.width / 2, bandMid, 0]} rotation={[0, -Math.PI / 2, 0]}>
+            <planeGeometry args={[input.length, bandH]} />
             <meshStandardMaterial map={meshTex} transparent opacity={0.72} side={DoubleSide} color="#c5d6a8" />
           </mesh>
         </>
@@ -421,10 +445,12 @@ function CageModel({
         )
       })}
 
+      {geo.v2 ? null : (
       <mesh geometry={ridgeGeom}>
         <meshStandardMaterial color={STAY_COLOUR.ridge} emissive="#2f6b38" emissiveIntensity={0.35} roughness={0.4} />
       </mesh>
-      {purlinGeoms.map((g, i) => (
+      )}
+      {geo.v2 ? null : purlinGeoms.map((g, i) => (
         <mesh key={`purlin-${i}`} geometry={g}>
           <meshStandardMaterial
             color={input.purlinMaterial === 'wire' ? STAY_COLOUR.purlin : hoopMat.colour}
@@ -436,9 +462,24 @@ function CageModel({
         </mesh>
       ))}
 
-      {input.sleeperBase ? <Sleeper input={input} /> : null}
+      {input.sleeperBase ? <Sleeper input={input} fullRing={input.design === 'v2'} /> : null}
 
-      {showBracing ? (
+      {v2Geoms ? (
+        <group>
+          {v2Geoms.battens.map((g, i) => (
+            <mesh key={`batten-${i}`} geometry={g} renderOrder={2}>
+              <meshBasicMaterial color={STAY_COLOUR.batten} />
+            </mesh>
+          ))}
+          {v2Geoms.diagonals.map((g, i) => (
+            <mesh key={`diagonal-${i}`} geometry={g} renderOrder={3}>
+              <meshBasicMaterial color={STAY_COLOUR.diagonal} />
+            </mesh>
+          ))}
+        </group>
+      ) : null}
+
+      {showBracing && !geo.v2 ? (
         <group>
           {bracingGeoms.guys.map((g, i) => (
             <mesh key={`guy-${i}`} geometry={g} renderOrder={2}>
@@ -498,7 +539,21 @@ function CageModel({
         </group>
       ))}
 
-      {geo.doorPosts.map((post, i) => {
+      {geo.v2
+        ? geo.v2.endPosts.map((post, i) => (
+            <group key={`shs-${i}`} position={[post.x, 0, post.z]}>
+              <mesh position={[0, (post.top - post.embed) / 2, 0]}>
+                <boxGeometry args={[0.05, post.length, 0.05]} />
+                <meshStandardMaterial color="#9aa3a8" metalness={0.62} roughness={0.28} />
+              </mesh>
+              <mesh position={[0, 0.03, 0]}>
+                <cylinderGeometry args={[0.125, 0.125, 0.06, 16]} />
+                <meshStandardMaterial color="#b7b1a6" roughness={0.92} />
+              </mesh>
+            </group>
+          ))
+        : null}
+      {geo.v2 ? null : geo.doorPosts.map((post, i) => {
         const above = MESH_GATE.postLengthM - MESH_GATE.embedM
         const radius = (MESH_GATE.postOdMinMm + MESH_GATE.postOdMaxMm) / 4000
         return (
@@ -546,23 +601,23 @@ function CageModel({
       >
         {input.doorStyle === 'mesh-gate' ? (
           <>
-            <mesh position={[input.doorWidth / 2, input.doorHeight / 2, 0]}>
+            <mesh position={[input.doorWidth / 2, gateLift + input.doorHeight / 2, 0]}>
               <planeGeometry args={[Math.max(0.2, input.doorWidth - 0.08), input.doorHeight - 0.06]} />
               <meshStandardMaterial map={meshTex} transparent opacity={0.88} side={DoubleSide} color="#d5d8cc" metalness={0.35} roughness={0.45} />
             </mesh>
-            <mesh position={[0.02, input.doorHeight / 2, 0]}>
+            <mesh position={[0.02, gateLift + input.doorHeight / 2, 0]}>
               <boxGeometry args={[0.03, input.doorHeight, 0.03]} />
               <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
             </mesh>
-            <mesh position={[input.doorWidth - 0.02, input.doorHeight / 2, 0]}>
+            <mesh position={[input.doorWidth - 0.02, gateLift + input.doorHeight / 2, 0]}>
               <boxGeometry args={[0.03, input.doorHeight, 0.03]} />
               <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
             </mesh>
-            <mesh position={[input.doorWidth / 2, input.doorHeight - 0.015, 0]}>
+            <mesh position={[input.doorWidth / 2, gateLift + input.doorHeight - 0.015, 0]}>
               <boxGeometry args={[input.doorWidth, 0.03, 0.03]} />
               <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
             </mesh>
-            <mesh position={[input.doorWidth / 2, 0.03, 0]}>
+            <mesh position={[input.doorWidth / 2, gateLift + 0.02, 0]}>
               <boxGeometry args={[input.doorWidth, 0.03, 0.03]} />
               <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
             </mesh>

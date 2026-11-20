@@ -37,6 +37,13 @@ const inputSchema = {
   ownedPickets: z.number().optional(),
   tomatoTrellis: z.boolean().optional(),
   netType: z.enum(['wildlife5', 'bird5']).optional(),
+  design: z.enum(['classic', 'v2']).optional(),
+  cover: z.enum(['bird-net', 'shade-30']).optional(),
+}
+
+function applyCover(args: Partial<CageInputs>): Partial<CageInputs> {
+  if (args.design === 'classic' || args.cover === undefined || args.hoopSpacing !== undefined) return args
+  return { ...args, hoopSpacing: args.cover === 'shade-30' ? 1.25 : 10 / 7 }
 }
 
 function text(payload: unknown) {
@@ -47,21 +54,21 @@ server.registerTool(
   'compute_cage',
   {
     description:
-      'Size a walk-in vegie cage. Partial inputs are filled from the Marek 5×10 default. Returns geometry, warnings, and the bill of materials. The wind figures are a rough check, not engineering.',
+      'Size a walk-in vegie cage. Partial inputs are filled from the Marek 4.6×10 v2 default (bird net, 8 hoops). Pass cover shade-30 for 30% shade cloth at 1.25 m (9 hoops) unless hoopSpacing is set. design classic keeps guys and a ridge pipe. Returns geometry, warnings, and the bill of materials. The wind figures are a rough check, not engineering.',
     inputSchema,
   },
-  async (args) => text(computeCage(args as Partial<CageInputs>)),
+  async (args) => text(computeCage(applyCover(args as Partial<CageInputs>))),
 )
 
 server.registerTool(
   'build_guide',
   {
     description:
-      'Step-by-step build guide for this cage. Lengths, counts, and positions come from computeCage. Partial inputs are filled from the Marek 5×10 default. Warnings include the rough wind check.',
+      'Step-by-step build guide for this cage. Lengths, counts, and positions come from computeCage. Partial inputs are filled from the Marek 4.6×10 v2 default. cover shade-30 selects 9 hoops at 1.25 m unless hoopSpacing is set.',
     inputSchema,
   },
   async (args) => {
-    const result = computeCage(args as Partial<CageInputs>)
+    const result = computeCage(applyCover(args as Partial<CageInputs>))
     return text({ guide: result.guide, warnings: result.warnings, text: guidePlainText(result.guide) })
   },
 )
@@ -86,7 +93,7 @@ server.registerTool(
 server.registerTool(
   'get_defaults',
   {
-    description: 'Return the default cage inputs (Marek 5×10).',
+    description: 'Return the default cage inputs (Marek 4.6×10, bird net, seven battens).',
     inputSchema: {},
   },
   async () => text(DEFAULTS),

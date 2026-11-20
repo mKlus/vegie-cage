@@ -3,7 +3,7 @@ import { buildBom } from './bom'
 import { endAnchorOutM, layoutBracing } from './bracing'
 import { buildGeometry, hoopStations } from './geometry'
 import { buildGuide } from './guide'
-import { DEFAULTS, PRESETS, sanitise } from './model'
+import { PRESETS, sanitise } from './model'
 
 describe('layoutBracing', () => {
   const marekZs = hoopStations(10, 1.25)
@@ -74,9 +74,22 @@ describe('layoutBracing', () => {
     expect(b.sideGuys[0]?.to.x).toBeCloseTo(-3.7, 5)
   })
 
-  it('matches the Marek bill: 4 end anchors plus the side guys', () => {
-    const geo = buildGeometry(DEFAULTS)
-    const bom = buildBom(DEFAULTS)
+  it('matches the classic 5×10 bill: 4 end anchors plus the side guys', () => {
+    const classic = sanitise({
+      design: 'classic',
+      length: 10,
+      width: 5,
+      meshHeight: 1,
+      peakHeight: 3,
+      hoopSpacing: 1.25,
+      wallMesh: 'hex50',
+      embedDepth: 0.6,
+      pipeInsert: 0.2,
+      doorHeight: 2,
+      netType: 'wildlife5',
+    })
+    const geo = buildGeometry(classic)
+    const bom = buildBom(classic)
     expect(geo.bracing.anchorCount).toBe(9)
     expect(bom.lines.find((l) => l.id === 'anchors')?.qty).toBe(geo.bracing.anchorCount)
     expect(bom.lines.find((l) => l.id === 'anchors')?.exact).toMatch(/4 end \+ 5 side = 9/)
@@ -90,7 +103,7 @@ describe('layoutBracing', () => {
     expect(bom.lines.find((l) => l.id === 'brace-clips')?.note).toMatch(/Unverified/)
     expect(bom.lines.find((l) => l.id === 'brace-clips')?.inTotal).toBe(true)
 
-    const step = buildGuide(DEFAULTS, geo).find((s) => s.id === 'braces')
+    const step = buildGuide(classic, geo).find((s) => s.id === 'braces')
     expect(step?.text).toMatch(/Stays & bracing/)
     expect(step?.text).toMatch(/4 end \+ 5 side = 9/)
     expect(step?.text).toMatch(/Gripple/)
