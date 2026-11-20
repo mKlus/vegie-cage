@@ -22,7 +22,14 @@ describe('prices', () => {
     }
     expect(price('poly32')).toMatchObject({ aud: 127, verified: true })
     expect(price('poly50').verified).toBe(false)
-    expect(price('star-1.8').verified).toBe(true)
+    expect(price('star-1.8')).toMatchObject({
+      aud: 29.4,
+      verified: true,
+      date: '2026-11-20',
+      source: 'Southern Farm Supplies Bega receipt',
+    })
+    expect(price('mesh-gate-1x2').verified).toBe(false)
+    expect(price('door-post-50').verified).toBe(false)
   })
 
   it('formats AUD', () => {

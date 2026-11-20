@@ -33,6 +33,9 @@ const inputSchema = {
   doorWall: z.enum(['end', 'side']).optional(),
   doorWidth: z.number().optional(),
   doorHeight: z.number().optional(),
+  doorStyle: z.enum(['timber', 'mesh-gate']).optional(),
+  ownedPickets: z.number().optional(),
+  tomatoTrellis: z.boolean().optional(),
   netType: z.enum(['wildlife5', 'bird5']).optional(),
 }
 

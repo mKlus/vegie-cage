@@ -25,7 +25,7 @@ type ControlsHandle = {
 }
 import { BIRDIES_COLORS } from '../lib/birdies'
 import { RIDGE_PAST_END_M } from '../lib/fixings'
-import { HOOP_MATERIAL, SLEEPER, WALL_MESH, type CageInputs } from '../lib/model'
+import { HOOP_MATERIAL, MESH_GATE, SLEEPER, WALL_MESH, type CageInputs } from '../lib/model'
 
 export type ViewId = 'iso' | 'end' | 'side' | 'top' | 'plan'
 
@@ -421,6 +421,23 @@ function CageModel({
         </group>
       ))}
 
+      {geo.doorPosts.map((post, i) => {
+        const above = MESH_GATE.postLengthM - MESH_GATE.embedM
+        const radius = (MESH_GATE.postOdMinMm + MESH_GATE.postOdMaxMm) / 4000
+        return (
+          <group key={`door-post-${i}`} position={[post.x, 0, post.z]}>
+            <mesh position={[0, (above - MESH_GATE.embedM) / 2, 0]}>
+              <cylinderGeometry args={[radius, radius, MESH_GATE.postLengthM, 12]} />
+              <meshStandardMaterial color="#8a9298" metalness={0.55} roughness={0.32} />
+            </mesh>
+            <mesh position={[0, 0.03, 0]}>
+              <cylinderGeometry args={[MESH_GATE.holeDiaM / 2, MESH_GATE.holeDiaM / 2, 0.06, 16]} />
+              <meshStandardMaterial color="#b7b1a6" roughness={0.92} />
+            </mesh>
+          </group>
+        )
+      })}
+
       {showNet ? (
         <>
           <mesh geometry={netGeom}>
@@ -443,21 +460,52 @@ function CageModel({
       ) : null}
 
       <group
-        position={[-input.doorWidth / 2, 0, -input.length / 2 - 0.04]}
-        rotation={[0, doorOpen ? 1.45 : 0, 0]}
+        position={
+          input.doorWall === 'side'
+            ? [input.width / 2 + 0.04, 0, -input.doorWidth / 2]
+            : [-input.doorWidth / 2, 0, -input.length / 2 - 0.04]
+        }
+        rotation={[0, (input.doorWall === 'side' ? -Math.PI / 2 : 0) + (doorOpen ? 1.45 : 0), 0]}
       >
-        <mesh position={[input.doorWidth / 2, input.doorHeight / 2, 0]}>
-          <boxGeometry args={[input.doorWidth, input.doorHeight, 0.05]} />
-          <meshStandardMaterial color="#6b8f3a" transparent opacity={0.55} />
-        </mesh>
-        <mesh position={[0.03, input.doorHeight / 2, 0]}>
-          <boxGeometry args={[0.06, input.doorHeight, 0.08]} />
-          <meshStandardMaterial color="#6a4420" />
-        </mesh>
-        <mesh position={[input.doorWidth - 0.03, input.doorHeight / 2, 0]}>
-          <boxGeometry args={[0.06, input.doorHeight, 0.08]} />
-          <meshStandardMaterial color="#6a4420" />
-        </mesh>
+        {input.doorStyle === 'mesh-gate' ? (
+          <>
+            <mesh position={[input.doorWidth / 2, input.doorHeight / 2, 0]}>
+              <planeGeometry args={[Math.max(0.2, input.doorWidth - 0.08), input.doorHeight - 0.06]} />
+              <meshStandardMaterial map={meshTex} transparent opacity={0.88} side={DoubleSide} color="#d5d8cc" metalness={0.35} roughness={0.45} />
+            </mesh>
+            <mesh position={[0.02, input.doorHeight / 2, 0]}>
+              <boxGeometry args={[0.03, input.doorHeight, 0.03]} />
+              <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
+            </mesh>
+            <mesh position={[input.doorWidth - 0.02, input.doorHeight / 2, 0]}>
+              <boxGeometry args={[0.03, input.doorHeight, 0.03]} />
+              <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
+            </mesh>
+            <mesh position={[input.doorWidth / 2, input.doorHeight - 0.015, 0]}>
+              <boxGeometry args={[input.doorWidth, 0.03, 0.03]} />
+              <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
+            </mesh>
+            <mesh position={[input.doorWidth / 2, 0.03, 0]}>
+              <boxGeometry args={[input.doorWidth, 0.03, 0.03]} />
+              <meshStandardMaterial color="#9aa3a8" metalness={0.6} roughness={0.32} />
+            </mesh>
+          </>
+        ) : (
+          <>
+            <mesh position={[input.doorWidth / 2, input.doorHeight / 2, 0]}>
+              <boxGeometry args={[input.doorWidth, input.doorHeight, 0.05]} />
+              <meshStandardMaterial color="#6b8f3a" transparent opacity={0.55} />
+            </mesh>
+            <mesh position={[0.03, input.doorHeight / 2, 0]}>
+              <boxGeometry args={[0.06, input.doorHeight, 0.08]} />
+              <meshStandardMaterial color="#6a4420" />
+            </mesh>
+            <mesh position={[input.doorWidth - 0.03, input.doorHeight / 2, 0]}>
+              <boxGeometry args={[0.06, input.doorHeight, 0.08]} />
+              <meshStandardMaterial color="#6a4420" />
+            </mesh>
+          </>
+        )}
       </group>
 
       {/* 1.7 m person on the centre path */}

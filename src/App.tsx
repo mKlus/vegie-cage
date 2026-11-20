@@ -167,7 +167,7 @@ export default function App() {
           </div>
         </div>
         <p className="lede">
-          Star pickets, chicken wire, poly hoops, taut net. Marek 5×10 is the default. Place Birdies
+          Star pickets, chicken wire, poly hoops, taut net, mesh gate. Marek 5×10 is the default. Place Birdies
           beds on the Plan, then read the cut list. The address bar is the share link.
         </p>
         <div className="mast-tools">

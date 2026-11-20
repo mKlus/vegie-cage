@@ -16,6 +16,8 @@ export type WallMesh = 'hex50' | 'hex40' | 'hex25' | 'weld25' | 'weld12'
 export type PostType = 'star' | 'pine90' | 'galv50nb'
 export type NetType = 'wildlife5' | 'bird5'
 export type DoorWall = 'end' | 'side'
+/** `mesh-gate`: concreted round posts and a prefab gate. `timber`: picket jambs and a pine leaf. */
+export type DoorStyle = 'timber' | 'mesh-gate'
 export type PurlinSet = 1 | 3
 export type PurlinMaterial = 'pipe' | 'wire'
 export type SkirtMode = 'buried-vertical' | 'l-outward' | 'none'
@@ -26,6 +28,21 @@ export const SLEEPER = {
   thickM: 0.05,
   buryM: 0.15,
   revealM: 0.05,
+} as const
+
+/**
+ * Prefab gate, like the orchard enclosure. 3.0 m posts: 600 mm in concrete still leaves 2.4 m
+ * above ground, clear of a 2.0 m gate. Prices for these parts are unverified.
+ * Two 300 × 600 mm holes are about 0.085 m³; ~0.01 m³ per 20 kg bag, plus waste → 10 bags.
+ */
+export const MESH_GATE = {
+  postOdMinMm: 50,
+  postOdMaxMm: 65,
+  postLengthM: 3,
+  embedM: 0.6,
+  holeDiaM: 0.3,
+  concreteBags: 10,
+  concreteBagKg: 20,
 } as const
 export type PicketLength = 1.65 | 1.8 | 2.1 | 2.4
 
@@ -50,6 +67,11 @@ export type CageInputs = {
   doorWall: DoorWall
   doorWidth: number
   doorHeight: number
+  doorStyle: DoorStyle
+  /** 1.8 m Galstar Maxy posts already bought. Deducted only when the build uses that picket. */
+  ownedPickets: number
+  /** Separate tomato fence inside the cage. Already bought. Not wall mesh and not the door. */
+  tomatoTrellis: boolean
   skirtMode: SkirtMode
   skirtDepth: number
   sleeperBase: boolean
@@ -82,6 +104,9 @@ export const DEFAULTS: CageInputs = {
   doorWall: 'end',
   doorWidth: 1,
   doorHeight: 2,
+  doorStyle: 'mesh-gate',
+  ownedPickets: 4,
+  tomatoTrellis: true,
   skirtMode: 'none',
   skirtDepth: 0.25,
   sleeperBase: true,
@@ -101,7 +126,7 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
   {
     id: 'marek-5x10',
     label: 'Marek 5×10',
-    note: '10 × 5 m, peak 3.0 m. 9 hoops at 1.25 m. 1.8 m pickets driven 600 mm, 1.0 m wire from ground level, sleeve 1.0–1.2 m, one 50 mm poly ridge, two 2.5 mm purlin wires, no skirt, 200×50 sleeper 150 mm in / 50 mm up.',
+    note: '10 × 5 m, peak 3.0 m. 9 hoops at 1.25 m. Galvanised Waratah Galstar Maxy 1.8 m pickets driven 600 mm (4 already bought). 1.0 m wire from ground level, sleeve 1.0–1.2 m, one 50 mm poly ridge, two 2.5 mm purlin wires, no skirt, 200×50 sleeper 150 mm in / 50 mm up. Mesh gate on two concreted 50–65 mm posts. Tomato trellis (2 Ultraposts + 10 m dog fence) already bought, inside the cage.',
     patch: {
       length: 10,
       width: 5,
@@ -118,6 +143,9 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       doorWall: 'end',
       doorWidth: 1,
       doorHeight: 2,
+      doorStyle: 'mesh-gate',
+      ownedPickets: 4,
+      tomatoTrellis: true,
       skirtMode: 'none',
       skirtDepth: 0.25,
       sleeperBase: true,
@@ -143,6 +171,9 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       postType: 'star',
       purlins: 3,
       purlinMaterial: 'wire',
+      doorStyle: 'timber',
+      ownedPickets: 0,
+      tomatoTrellis: false,
       picketLength: 2.1,
       embedDepth: 0.7,
       pipeInsert: 0.2,
@@ -166,6 +197,9 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       embedDepth: 0.7,
       pipeInsert: 0.2,
       wallMesh: 'weld25',
+      doorStyle: 'timber',
+      ownedPickets: 0,
+      tomatoTrellis: false,
       beds: packOwnedFour(10, 6),
     },
   },
@@ -183,6 +217,9 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       embedDepth: 0.7,
       pipeInsert: 0.2,
       wallMesh: 'weld25',
+      doorStyle: 'timber',
+      ownedPickets: 0,
+      tomatoTrellis: false,
       beds: packOwnedFour(14, 6),
     },
   },
@@ -202,6 +239,9 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       wallMesh: 'hex25',
       doorWidth: 0.9,
       doorHeight: 1.2,
+      doorStyle: 'timber',
+      ownedPickets: 0,
+      tomatoTrellis: false,
       purlins: 1,
       purlinMaterial: 'pipe',
       picketLength: 1.65,
@@ -350,6 +390,9 @@ export function sanitise(raw: LegacyInputs): CageInputs {
     doorWall: src.doorWall === 'side' ? 'side' : 'end',
     doorWidth,
     doorHeight,
+    doorStyle: src.doorStyle === 'timber' ? 'timber' : 'mesh-gate',
+    ownedPickets: clamp(Math.round(num(src.ownedPickets, DEFAULTS.ownedPickets)), 0, 40),
+    tomatoTrellis: src.tomatoTrellis === true,
     skirtMode: skirt.mode,
     skirtDepth: clamp(skirt.depth, LIMITS.skirtDepth.min, LIMITS.skirtDepth.max),
     sleeperBase: src.sleeperBase !== false,

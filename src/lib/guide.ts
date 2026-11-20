@@ -11,6 +11,7 @@ import {
 import { NET_OVERLAP_M, type CageGeometry, type ExtraPost } from './geometry'
 import {
   HOOP_MATERIAL,
+  MESH_GATE,
   SLEEPER,
   WALL_MESH,
   formatM,
@@ -71,7 +72,7 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
     {
       id: 'tools',
       title: 'Tools and safety',
-      text: `Call 1100 (Dial Before You Dig) before any peg, picket, or trench. Gloves and eye protection for the whole job. Cap every picket the hoop will not cover. Take a 30 m tape, string line, pegs, post driver or club hammer, spirit level, marker, spade, drill, fencing pliers, wire grips, hog-ring pliers, side cutters, a hacksaw or poly cutter, galvanised staples, and a ladder.`,
+      text: `Call 1100 (Dial Before You Dig) before any peg, picket, or trench. Gloves and eye protection for the whole job. Cap every picket the hoop will not cover. Take a 30 m tape, string line, pegs, post driver or club hammer, spirit level, marker, spade, drill, fencing pliers, wire grips, hog-ring pliers, side cutters, a hacksaw or poly cutter, galvanised staples, and a ladder.${input.doorStyle === 'mesh-gate' ? ' Post-hole shovel and concrete for the two door posts.' : ''}`,
     },
     {
       id: 'setout',
@@ -86,7 +87,7 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
     {
       id: 'pickets',
       title: 'Drive the pickets',
-      text: `${geo.hoopCount} hoops at ${formatM(geo.actualSpacing, 2)}, so ${geo.hoopCount} pickets on each long side (${geo.pickets.hoop} under hoops). From ${origin}: ${listM(hoopFromEnd)}. ${input.picketLength.toFixed(2)} m pickets. Mark ${mm(input.embedDepth)} up from the tip and drive until the mark meets finished ground. Check plumb both ways. Tops level, ${formatM(geo.stickUp, 2)} above ground. Between the corner hoops, measure from the same long side. ${input.doorWall === 'end' ? 'Door end' : 'Near end'}: ${listM(nearRow)}. Far end: ${listM(farRow)}. ${jambs.length ? `Door jambs at ${listM(jambs)} (${formatM(input.doorWidth, 2)} opening on the ${input.doorWall} wall).` : `Door opening ${formatM(input.doorWidth, 2)} on the ${input.doorWall} wall.`} ${geo.pickets.total} pickets in all.`,
+      text: `${geo.hoopCount} hoops at ${formatM(geo.actualSpacing, 2)}, so ${geo.hoopCount} pickets on each long side (${geo.pickets.hoop} under hoops). From ${origin}: ${listM(hoopFromEnd)}. ${input.picketLength.toFixed(2)} m pickets. Mark ${mm(input.embedDepth)} up from the tip and drive until the mark meets finished ground. Check plumb both ways. Tops level, ${formatM(geo.stickUp, 2)} above ground. Between the corner hoops, measure from the same long side. ${input.doorWall === 'end' ? 'Door end' : 'Near end'}: ${listM(nearRow)}. Far end: ${listM(farRow)}. ${jambs.length ? `Door jambs at ${listM(jambs)} (${formatM(input.doorWidth, 2)} opening on the ${input.doorWall} wall).` : `Door opening ${formatM(input.doorWidth, 2)} on the ${input.doorWall} wall, left clear of pickets.`} ${geo.pickets.total} pickets in all.`,
     },
     {
       id: 'stays',
@@ -148,8 +149,20 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
     {
       id: 'door',
       title: 'Door',
-      text: `Frame a ${formatM(input.doorWidth, 2)} × ${formatM(input.doorHeight, 2)} door on the ${input.doorWall} wall, between the jamb pickets. 70×35 leaf: two stiles, three rails, one diagonal brace. Three hinges, a latch a dog cannot nose, and a drop bolt into a pipe socket. Mesh on the lower ${formatM(Math.min(input.meshHeight, input.doorHeight), 2)}, net above that.`,
+      text:
+        input.doorStyle === 'mesh-gate'
+          ? `On the ${input.doorWall} wall, dig two holes about ${mm(MESH_GATE.holeDiaM)} across and at least ${mm(MESH_GATE.embedM)} deep, at the edges of the ${formatM(input.doorWidth, 2)} opening. Set two galvanised round posts (${MESH_GATE.postOdMinMm}–${MESH_GATE.postOdMaxMm} mm, ${formatM(MESH_GATE.postLengthM, 1)} long) in concrete, plumb both ways. About ${formatM(MESH_GATE.postLengthM - MESH_GATE.embedM, 2)} stays above ground, clear of a ${formatM(input.doorHeight, 2)} gate. Leave the concrete to cure. Hang a prefabricated galvanised mesh gate about ${formatM(input.doorWidth, 2)} × ${formatM(input.doorHeight, 2)}. Gate hinges and a latch a dog cannot nose. No star-picket jambs and no pine frame.`
+          : `Frame a ${formatM(input.doorWidth, 2)} × ${formatM(input.doorHeight, 2)} door on the ${input.doorWall} wall, between the jamb pickets. 70×35 leaf: two stiles, three rails, one diagonal brace. Three hinges, a latch a dog cannot nose, and a drop bolt into a pipe socket. Mesh on the lower ${formatM(Math.min(input.meshHeight, input.doorHeight), 2)}, net above that.`,
     },
+    ...(input.tomatoTrellis
+      ? [
+          {
+            id: 'tomato',
+            title: 'Tomato trellis',
+            text: 'Optional, and already bought. Inside the cage, not on the walls or the door: stand 2 × Whites Ultrapost 2.4 m and hang Whites Dog Fence Medium, 120 cm × 10 m, as a tomato trellis.',
+          },
+        ]
+      : []),
     {
       id: 'net',
       title: 'End walls and roof net',
@@ -160,13 +173,13 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
       title: 'Picket caps',
       text:
         geo.pickets.caps > 0
-          ? `Fit safety caps on the ${geo.pickets.caps} pickets the hoop does not cover: end wall, door jambs, and corner stays. Hoop pickets are sleeved and stay bare. Cap the bare ones before you leave the site.`
+          ? `Fit safety caps on the ${geo.pickets.caps} pickets the hoop does not cover: end wall${geo.pickets.jambs ? ', door jambs,' : ''} and corner stays. Hoop pickets are sleeved and stay bare. Cap the bare ones before you leave the site.`
           : `This post type does not take a star-picket cap. Still cover or file any sharp top before you leave the site.`,
     },
     {
       id: 'check',
       title: 'Final check',
-      text: `Walk the cage. Line wires${input.purlins === 3 ? ' and purlins are' : ' are'} tight. Every hoop is tied ${input.purlins === 3 ? 'at the ridge and at both purlins' : 'at the ridge'}, tails folded in. No rattle in the sleeves. Mesh stops below ${formatM(geo.sleeveBot, 2)}. No gap at the sleeper, the door, or the net overlap that a rabbit or a bird can use. Guys are on both ends, anchors are in. Caps are on every bare picket. Peak still reads ${formatM(input.peakHeight, 2)}.`,
+      text: `Walk the cage. Line wires${input.purlins === 3 ? ' and purlins are' : ' are'} tight. Every hoop is tied ${input.purlins === 3 ? 'at the ridge and at both purlins' : 'at the ridge'}, tails folded in. No rattle in the sleeves. Mesh stops below ${formatM(geo.sleeveBot, 2)}. No gap at the sleeper, the door, or the net overlap that a rabbit or a bird can use. Guys are on both ends, anchors are in. Caps are on every bare picket. Peak still reads ${formatM(input.peakHeight, 2)}.${input.doorStyle === 'mesh-gate' ? ' Gate closes, latches, and clears the ground.' : ''}`,
     },
   ]
 

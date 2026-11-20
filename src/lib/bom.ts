@@ -15,6 +15,7 @@ import {
 import { buildGeometry, warnings, type CageGeometry } from './geometry'
 import {
   HOOP_MATERIAL,
+  MESH_GATE,
   POST_TYPE,
   SLEEPER,
   WALL_MESH,
@@ -208,19 +209,30 @@ export function buildBom(input: CageInputs): BomResult {
 
   const postCount = geo.pickets.total
   const postQuote = postPrice(input.postType, input.picketLength)
+  const galstar = input.postType === 'star' && input.picketLength === 1.8
+  const ownedPosts = galstar ? Math.min(input.ownedPickets, postCount) : 0
+  const postBuy = postCount - ownedPosts
+  const jambBit = geo.pickets.jambs > 0 ? ` including ${geo.pickets.jambs} door jambs` : ''
+  const ownedBit =
+    ownedPosts > 0
+      ? ` Already have ${ownedPosts} (receipt 20 Nov 2026). The estimate prices the ${postBuy} still to buy.`
+      : ''
   lines.push(
     moneyLine(
       {
         id: 'posts',
         category: 'Fence',
         item: 'Posts',
-        spec: `${post.label}, ${input.picketLength.toFixed(2)} m`,
+        spec: galstar ? postQuote.label : `${post.label}, ${input.picketLength.toFixed(2)} m`,
         exact: `${postCount} posts × ${input.picketLength.toFixed(2)} m (${round1(postCount * input.picketLength).toFixed(1)} m)`,
         exactM: round2(postCount * input.picketLength),
-        buy: `${postCount} × ${input.picketLength.toFixed(2)} m`,
-        note: `Embed ${(input.embedDepth * 1000).toFixed(0)} mm, stick-up ${geo.stickUp.toFixed(2)} m. ${geo.pickets.hoop} under hoops (no caps), ${geo.pickets.end} end-wall including ${geo.pickets.jambs} door jambs, ${geo.pickets.stays} corner stays. ${postQuote.source}.`,
+        buy:
+          ownedPosts > 0
+            ? `already have ${ownedPosts}; buy ${postBuy}`
+            : `${postCount} × ${input.picketLength.toFixed(2)} m`,
+        note: `Embed ${(input.embedDepth * 1000).toFixed(0)} mm, stick-up ${geo.stickUp.toFixed(2)} m. ${geo.pickets.hoop} under hoops (no caps), ${geo.pickets.end} end-wall${jambBit}, ${geo.pickets.stays} corner stays.${galstar ? ' Galvanised.' : ''}${ownedBit} ${postQuote.source}.`,
       },
-      postCount,
+      postBuy,
       postQuote.aud,
     ),
   )
@@ -238,7 +250,10 @@ export function buildBom(input: CageInputs): BomResult {
           exact: `${geo.pickets.caps} caps`,
           exactM: geo.pickets.caps,
           buy: `${packs} × pack of 10`,
-          note: 'Only pickets the hoop does not cover: end wall, door jambs, corner stays. Hoop pickets are sleeved.',
+          note:
+            input.doorStyle === 'mesh-gate'
+              ? 'Only pickets the hoop does not cover: end wall and corner stays. Hoop pickets are sleeved. The concreted door posts take no caps.'
+              : 'Only pickets the hoop does not cover: end wall, door jambs, corner stays. Hoop pickets are sleeved.',
         },
         packs,
         cap.aud,
@@ -404,44 +419,143 @@ export function buildBom(input: CageInputs): BomResult {
 
   const doorH = input.doorHeight
   const doorW = input.doorWidth
-  const doorStick = 2 * doorH + 3 * doorW
-  const doorQuote = price('pine-70x35-2.4')
-  const doorSticks = ceilTo(doorStick + 2 * doorH, 2.4)
+  let doorStick = 0
+  if (input.doorStyle === 'mesh-gate') {
+    const doorPost = price('door-post-50')
+    lines.push(
+      moneyLine(
+        {
+          id: 'door-posts',
+          category: 'Door',
+          item: 'Door posts',
+          spec: doorPost.label,
+          exact: `2 × ${MESH_GATE.postLengthM.toFixed(1)} m, set ${Math.round(MESH_GATE.embedM * 1000)} mm in concrete`,
+          exactM: round2(2 * MESH_GATE.postLengthM),
+          buy: '2 posts',
+          note: `Galvanised round, about ${MESH_GATE.postOdMinMm}–${MESH_GATE.postOdMaxMm} mm. Stick-up ${(MESH_GATE.postLengthM - MESH_GATE.embedM).toFixed(1)} m clears a ${doorH.toFixed(1)} m gate. Not star pickets. ${doorPost.source}.`,
+        },
+        2,
+        doorPost.aud,
+      ),
+    )
+    const concrete = price('concrete-20')
+    lines.push(
+      moneyLine(
+        {
+          id: 'door-concrete',
+          category: 'Door',
+          item: 'Concrete',
+          spec: concrete.label,
+          exact: `2 holes, ${Math.round(MESH_GATE.holeDiaM * 1000)} mm across × ${Math.round(MESH_GATE.embedM * 1000)} mm deep`,
+          exactM: MESH_GATE.concreteBags,
+          buy: `${MESH_GATE.concreteBags} × ${MESH_GATE.concreteBagKg} kg`,
+          note: `Bag count is a rough volume for the two holes, plus waste. ${concrete.source}.`,
+        },
+        MESH_GATE.concreteBags,
+        concrete.aud,
+      ),
+    )
+    const gate = price('mesh-gate-1x2')
+    lines.push(
+      moneyLine(
+        {
+          id: 'mesh-gate',
+          category: 'Door',
+          item: 'Mesh gate',
+          spec: gate.label,
+          exact: `${doorW.toFixed(2)} × ${doorH.toFixed(2)} m opening`,
+          exactM: round2(doorW * doorH),
+          buy: '1 prefabricated gate',
+          note: `Hang it on the round posts. Nominal size about 1.0 × 2.0 m. ${gate.source}.`,
+        },
+        1,
+        gate.aud,
+      ),
+    )
+  } else {
+    doorStick = 2 * doorH + 3 * doorW
+    const doorQuote = price('pine-70x35-2.4')
+    const doorSticks = ceilTo(doorStick + 2 * doorH, 2.4)
+    const doorTimber = doorStick + 2 * Math.max(doorH, input.meshHeight)
+    lines.push(
+      moneyLine(
+        {
+          id: 'door-frame',
+          category: 'Door',
+          item: 'Door frame + leaf',
+          spec: '70 × 35 H3 pine',
+          exact: `Leaf ${doorStick.toFixed(2)} m (2 stiles, 3 rails) + 2 jamb linings × ${Math.max(doorH, input.meshHeight).toFixed(2)} m`,
+          exactM: round2(doorTimber),
+          buy: `${doorSticks} × 2.4 m of 70 × 35`,
+          note: 'Diagonal brace on the leaf. Three hinges. Drop bolt into a pipe socket. Latch a dog cannot nose. Picket door jambs are in the post count.',
+        },
+        doorSticks,
+        doorQuote.aud,
+      ),
+    )
+    const doorMeshH = Math.min(input.meshHeight, doorH)
+    lines.push(
+      moneyLine(
+        {
+          id: 'door-skin',
+          category: 'Door',
+          item: 'Door skin',
+          spec: `${mesh.label} lower, net upper`,
+          exact: `Mesh ${doorW.toFixed(2)} × ${doorMeshH.toFixed(2)} m; net ${doorW.toFixed(2)} × ${Math.max(0, doorH - doorMeshH).toFixed(2)} m`,
+          exactM: round2(doorW * doorH),
+          buy: 'Cut from wall mesh + roof net leftovers',
+          note: 'Same rule as the walls: stiff mesh where animals push, net where they climb.',
+        },
+        0,
+        0,
+        false,
+      ),
+    )
+  }
+
+  const iron = price(input.doorStyle === 'mesh-gate' ? 'gate-hardware' : 'door-iron')
   lines.push(
     moneyLine(
       {
-        id: 'door-frame',
+        id: 'ironmongery',
         category: 'Door',
-        item: 'Door frame + leaf',
-        spec: '70 × 35 H3 pine',
-        exact: `Leaf ${doorStick.toFixed(2)} m (2 stiles, 3 rails) + 2 jamb linings × ${Math.max(doorH, input.meshHeight).toFixed(2)} m`,
-        exactM: round2(doorStick + 2 * Math.max(doorH, input.meshHeight)),
-        buy: `${doorSticks} × 2.4 m of 70 × 35`,
-        note: 'Diagonal brace on the leaf. Three hinges. Drop bolt into a pipe socket. Latch a dog cannot nose. Picket door jambs are in the post count.',
+        item: input.doorStyle === 'mesh-gate' ? 'Hinges and latch' : 'Door ironmongery',
+        spec:
+          input.doorStyle === 'mesh-gate'
+            ? 'Galvanised gate hinges and latch'
+            : '3 × 100 mm galvanised T-hinges, latch, drop bolt',
+        exact: input.doorStyle === 'mesh-gate' ? 'Hinges and 1 latch' : '3 hinges, 1 latch, 1 drop bolt, 1 pipe socket',
+        exactM: 0,
+        buy: '1 set',
+        note:
+          input.doorStyle === 'mesh-gate'
+            ? `A latch a dog cannot nose. ${iron.source}.`
+            : 'Self-closing spring optional. Threshold strip so the leaf does not snag mulch.',
       },
-      doorSticks,
-      doorQuote.aud,
+      1,
+      iron.aud,
     ),
   )
 
-  const doorMeshH = Math.min(input.meshHeight, doorH)
-  lines.push(
-    moneyLine(
-      {
-        id: 'door-skin',
-        category: 'Door',
-        item: 'Door skin',
-        spec: `${mesh.label} lower, net upper`,
-        exact: `Mesh ${doorW.toFixed(2)} × ${doorMeshH.toFixed(2)} m; net ${doorW.toFixed(2)} × ${Math.max(0, doorH - doorMeshH).toFixed(2)} m`,
-        exactM: round2(doorW * doorH),
-        buy: 'Cut from wall mesh + roof net leftovers',
-        note: 'Same rule as the walls: stiff mesh where animals push, net where they climb.',
-      },
-      0,
-      0,
-      false,
-    ),
-  )
+  if (input.tomatoTrellis) {
+    lines.push(
+      moneyLine(
+        {
+          id: 'tomato-trellis',
+          category: 'Inside',
+          item: 'Tomato trellis',
+          spec: '2 × Whites Ultrapost 2.4 m + Whites Dog Fence Medium 120 cm × 10 m',
+          exact: 'Separate fence inside the cage. Not the walls, the skirt, or the door.',
+          exactM: 10,
+          buy: 'already have',
+          note: 'Optional. Already bought. Two Ultraposts and one 10 m roll of dog fence. Do not use them on the cage.',
+        },
+        0,
+        0,
+        false,
+      ),
+    )
+  }
 
   const wire = wireTakeoff(input, geo.hoopCount, geo.meshRunM)
   const lineCount = wire.lineCount
@@ -831,24 +945,6 @@ export function buildBom(input: CageInputs): BomResult {
       },
       clipBags,
       clip.aud,
-    ),
-  )
-
-  const iron = price('door-iron')
-  lines.push(
-    moneyLine(
-      {
-        id: 'ironmongery',
-        category: 'Fixings',
-        item: 'Door ironmongery',
-        spec: '3 × 100 mm galvanised T-hinges, latch, drop bolt',
-        exact: '3 hinges, 1 latch, 1 drop bolt, 1 pipe socket',
-        exactM: 0,
-        buy: '1 set',
-        note: 'Self-closing spring optional. Threshold strip so the leaf does not snag mulch.',
-      },
-      1,
-      iron.aud,
     ),
   )
 

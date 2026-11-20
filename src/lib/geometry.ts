@@ -5,6 +5,8 @@ import { windCheck, type WindCheck } from './wind'
 
 export type ExtraPost = { x: number; z: number; capped: boolean; role: 'end' | 'jamb' | 'stay' }
 
+export type DoorPost = { x: number; z: number }
+
 export type PicketTakeoff = {
   hoop: number
   end: number
@@ -77,6 +79,8 @@ export type CageGeometry = {
   purlinPoints: Point[]
   pickets: PicketTakeoff
   extraPosts: ExtraPost[]
+  /** Galvanised round posts for a mesh gate. Empty when the door is a pine leaf on picket jambs. */
+  doorPosts: DoorPost[]
   net: NetTakeoff
   wind: WindCheck
 }
@@ -251,28 +255,47 @@ function fitNet(roofW: number, roofL: number, endArea: number): NetTakeoff {
   }
 }
 
+/** A picket this far inside the opening would stand in the gate. */
+function blocksDoor(coord: number, opening: number): boolean {
+  return Math.abs(coord) <= opening / 2 - 0.08
+}
+
+export function layoutDoorPosts(input: CageInputs): DoorPost[] {
+  if (input.doorStyle !== 'mesh-gate') return []
+  if (input.doorWall === 'end') {
+    const z = -input.length / 2
+    return [
+      { x: -input.doorWidth / 2, z },
+      { x: input.doorWidth / 2, z },
+    ]
+  }
+  const x = input.width / 2
+  return [
+    { x, z: -input.doorWidth / 2 },
+    { x, z: input.doorWidth / 2 },
+  ]
+}
+
 function layoutPickets(input: CageInputs, hoopCount: number): { pickets: PicketTakeoff; extraPosts: ExtraPost[] } {
   const spacing = input.hoopSpacing
   const stations = hoopStations(input.width, spacing)
   const intermediates = stations.slice(1, -1)
   const extraPosts: ExtraPost[] = []
   const jambEdges = [-input.doorWidth / 2, input.doorWidth / 2]
+  const meshGate = input.doorStyle === 'mesh-gate'
   let jambs = 0
 
   const pushEnd = (z: number, withDoor: boolean) => {
-    const xs = [...intermediates]
-    if (withDoor) {
+    const xs = intermediates.filter((x) => !(withDoor && blocksDoor(x, input.doorWidth)))
+    if (withDoor && !meshGate) {
       for (const edge of jambEdges) {
         const hit = xs.some((x) => Math.abs(x - edge) <= 0.2)
-        if (hit) jambs += 1
-        else {
-          xs.push(edge)
-          jambs += 1
-        }
+        if (!hit) xs.push(edge)
+        jambs += 1
       }
     }
     for (const x of xs) {
-      const isJamb = withDoor && jambEdges.some((edge) => Math.abs(x - edge) <= 0.2)
+      const isJamb = withDoor && !meshGate && jambEdges.some((edge) => Math.abs(x - edge) <= 0.2)
       extraPosts.push({ x, z, capped: input.postType === 'star', role: isJamb ? 'jamb' : 'end' })
     }
   }
@@ -283,15 +306,17 @@ function layoutPickets(input: CageInputs, hoopCount: number): { pickets: PicketT
   } else {
     pushEnd(-input.length / 2, false)
     pushEnd(input.length / 2, false)
-    const zEdges = [-input.doorWidth / 2, input.doorWidth / 2]
-    for (const z of zEdges) {
-      jambs += 1
-      extraPosts.push({
-        x: input.width / 2,
-        z,
-        capped: input.postType === 'star',
-        role: 'jamb',
-      })
+    if (!meshGate) {
+      const zEdges = [-input.doorWidth / 2, input.doorWidth / 2]
+      for (const z of zEdges) {
+        jambs += 1
+        extraPosts.push({
+          x: input.width / 2,
+          z,
+          capped: input.postType === 'star',
+          role: 'jamb',
+        })
+      }
     }
   }
 
@@ -431,6 +456,7 @@ export function buildGeometry(input: CageInputs): CageGeometry {
     purlinPoints: purlin ? [purlin.left, purlin.right] : [],
     pickets: posts.pickets,
     extraPosts: posts.extraPosts,
+    doorPosts: layoutDoorPosts(input),
     net,
     wind,
   }

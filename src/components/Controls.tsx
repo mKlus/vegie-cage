@@ -18,6 +18,7 @@ import {
   formatM,
   frameHeights,
   type CageInputs,
+  type DoorStyle,
   type HoopMaterial,
   type HoopOrigin,
   type NetType,
@@ -28,6 +29,7 @@ import {
   type SkirtMode,
   type WallMesh,
 } from '../lib/model'
+import { formatAud, price } from '../lib/prices'
 
 export type BedDraft = {
   width: number
@@ -430,6 +432,12 @@ export function Controls({
             ))}
           </select>
         </label>
+        {input.postType === 'star' && input.picketLength === 1.8 && input.ownedPickets > 0 ? (
+          <p className="hint">
+            {price('star-1.8').label}, {formatAud(price('star-1.8').aud)} each. Southern Farm Supplies, Bega, 20 Nov
+            2026. Already have {input.ownedPickets}. The list prices only the rest.
+          </p>
+        ) : null}
         <label className="select">
           Skirt
           <select
@@ -525,8 +533,32 @@ export function Controls({
 
       <section>
         <h2>Door</h2>
+        <label className="select">
+          Door
+          <select
+            value={input.doorStyle}
+            onChange={(e) => patch({ doorStyle: e.target.value as DoorStyle })}
+          >
+            <option value="mesh-gate">Galvanised mesh gate on round posts</option>
+            <option value="timber">Pine leaf on picket jambs</option>
+          </select>
+        </label>
         <Slider label="Door width" field="doorWidth" input={input} patch={patch} />
         <Slider label="Door height" field="doorHeight" input={input} patch={patch} />
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={input.tomatoTrellis}
+            onChange={(e) => patch({ tomatoTrellis: e.target.checked })}
+          />
+          Tomato trellis (already have)
+        </label>
+        {input.tomatoTrellis ? (
+          <p className="hint">
+            2 × Whites Ultrapost 2.4 m and Whites Dog Fence Medium 120 cm × 10 m. Inside the cage, not the walls or
+            the door.
+          </p>
+        ) : null}
       </section>
     </div>
   )

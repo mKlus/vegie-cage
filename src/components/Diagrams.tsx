@@ -1,7 +1,7 @@
 import { BIRDIES_COLORS } from '../lib/birdies'
 import { RIDGE_PAST_END_M } from '../lib/fixings'
 import type { CageGeometry } from '../lib/geometry'
-import { SLEEPER, formatM, type CageInputs } from '../lib/model'
+import { MESH_GATE, SLEEPER, formatM, type CageInputs } from '../lib/model'
 
 type DiagramsProps = {
   input: CageInputs
@@ -86,8 +86,20 @@ function EndElevation({ input, geo }: DiagramsProps) {
           y={sy(input.doorHeight)}
           width={input.doorWidth * s}
           height={input.doorHeight * s}
-          className="d-door"
+          className={input.doorStyle === 'mesh-gate' ? 'd-door-mesh' : 'd-door'}
         />
+        {input.doorStyle === 'mesh-gate' && input.doorWall === 'end'
+          ? ([-1, 1] as const).map((side) => (
+              <line
+                key={side}
+                x1={sx((side * input.doorWidth) / 2)}
+                y1={sy(-MESH_GATE.embedM)}
+                x2={sx((side * input.doorWidth) / 2)}
+                y2={sy(MESH_GATE.postLengthM - MESH_GATE.embedM)}
+                className="d-door-post"
+              />
+            ))
+          : null}
         <path
           d={`M ${sx(-input.doorWidth / 2)} ${sy(0)} A ${input.doorWidth * s} ${input.doorWidth * s} 0 0 0 ${sx(-input.doorWidth / 2)} ${sy(0) + 8}`}
           className="d-swing"

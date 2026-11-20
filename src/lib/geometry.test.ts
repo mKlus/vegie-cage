@@ -63,7 +63,15 @@ describe('buildGeometry', () => {
     const next = geo.hoopPoints[2]!
     expect(next.y).toBeGreaterThan(shoulder.y)
     expect(Math.abs(next.x - shoulder.x) / (next.y - shoulder.y)).toBeLessThan(0.25)
-    expect(geo.pickets).toEqual({ hoop: 18, end: 8, jambs: 2, stays: 4, total: 30, caps: 12 })
+    expect(geo.pickets).toEqual({ hoop: 18, end: 5, jambs: 0, stays: 4, total: 27, caps: 9 })
+    expect(geo.doorPosts).toEqual([
+      { x: -0.5, z: -5 },
+      { x: 0.5, z: -5 },
+    ])
+    expect(geo.extraPosts.some((p) => p.role === 'jamb')).toBe(false)
+    expect(
+      geo.extraPosts.some((p) => p.role !== 'stay' && Math.abs(p.z + 5) < 1e-6 && Math.abs(p.x) < 0.4),
+    ).toBe(false)
     expect(geo.net.endAreaM2).toBeLessThan(2 * DEFAULTS.width * DEFAULTS.peakHeight)
     expect(geo.net.endAreaM2).toBeGreaterThan(4)
     expect(geo.net.buy).toBe('3 × 4 × 10 m')

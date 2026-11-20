@@ -20,6 +20,7 @@ describe('build guide', () => {
       'purlins',
       'braces',
       'door',
+      'tomato',
       'net',
       'caps',
       'check',
@@ -40,6 +41,14 @@ describe('build guide', () => {
     expect(text).toContain('0 m, 1.25 m, 2.5 m, 3.75 m, 5 m, 6.25 m, 7.5 m, 8.75 m, 10 m')
     const hoops = result.guide.find((step) => step.id === 'hoops')
     expect(hoops?.text).toContain(result.geometry.pipeEachM.toFixed(2))
+    const door = result.guide.find((step) => step.id === 'door')
+    expect(door?.text).toMatch(/concrete/)
+    expect(door?.text).toMatch(/mesh gate/)
+    expect(door?.text).toMatch(/No star-picket jambs/)
+    expect(door?.text).not.toMatch(/70×35/)
+    expect(result.guide.find((step) => step.id === 'pickets')?.text).not.toMatch(/Door jambs/)
+    expect(result.guide.find((step) => step.id === 'tomato')?.text).toMatch(/Ultrapost/)
+    expect(result.guide.find((step) => step.id === 'tomato')?.text).toMatch(/not on the walls/)
     expect(result.geometry.hoopCount).toBe(9)
     expect(result.geometry.peakY).toBeCloseTo(DEFAULTS.peakHeight, 2)
     expect(result.warnings.some((w) => /not engineering/.test(w.text))).toBe(true)
