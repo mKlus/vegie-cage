@@ -48,8 +48,9 @@ describe('beds', () => {
 describe('buildGeometry', () => {
   it('Marek 5×10 sleeves the pipe on the picket top and keeps the tangent vertical', () => {
     const geo = buildGeometry(DEFAULTS)
-    expect(geo.hoopCount).toBe(11)
-    expect(geo.actualSpacing).toBeCloseTo(1, 2)
+    expect(geo.hoopCount).toBe(9)
+    expect(geo.actualSpacing).toBeCloseTo(1.25, 2)
+    expect(geo.peakY).toBeCloseTo(3, 2)
     expect(geo.stickUp).toBeCloseTo(1.2, 2)
     expect(geo.sleeveBot).toBeCloseTo(1, 2)
     expect(geo.sleeveTop).toBeCloseTo(1.2, 2)
@@ -62,7 +63,7 @@ describe('buildGeometry', () => {
     const next = geo.hoopPoints[2]!
     expect(next.y).toBeGreaterThan(shoulder.y)
     expect(Math.abs(next.x - shoulder.x) / (next.y - shoulder.y)).toBeLessThan(0.25)
-    expect(geo.pickets).toEqual({ hoop: 22, end: 8, jambs: 2, stays: 4, total: 34, caps: 12 })
+    expect(geo.pickets).toEqual({ hoop: 18, end: 8, jambs: 2, stays: 4, total: 30, caps: 12 })
     expect(geo.net.endAreaM2).toBeLessThan(2 * DEFAULTS.width * DEFAULTS.peakHeight)
     expect(geo.net.endAreaM2).toBeGreaterThan(4)
     expect(geo.net.buy).toBe('3 × 4 × 10 m')
@@ -86,7 +87,9 @@ describe('buildGeometry', () => {
     expect(marek.some((w) => /sleeve/.test(w.text) && w.level === 'bad')).toBe(false)
     expect(marek.some((w) => w.level === 'info' && /rabbit or fox/.test(w.text) && /150 mm/.test(w.text))).toBe(true)
     expect(marek.some((w) => /50 mm mesh/.test(w.text))).toBe(true)
-    expect(marek.some((w) => /not engineering/.test(w.text))).toBe(true)
+    expect(marek.some((w) => /not engineering/.test(w.text) && w.level === 'warn')).toBe(true)
+    expect(marek.some((w) => /Hoop spacing over 1\.2 m/.test(w.text))).toBe(true)
+    expect(buildGeometry(DEFAULTS).wind.over).toBe(true)
   })
 
   it('warns when a star picket will not enter small PVC', () => {

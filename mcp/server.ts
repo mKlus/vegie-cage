@@ -3,6 +3,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { z } from 'zod'
 
 import { computeCage } from '../src/lib/compute.ts'
+import { guidePlainText } from '../src/lib/guide.ts'
 import { DEFAULTS, PRESETS, type CageInputs } from '../src/lib/model.ts'
 
 const server = new McpServer({
@@ -47,6 +48,19 @@ server.registerTool(
     inputSchema,
   },
   async (args) => text(computeCage(args as Partial<CageInputs>)),
+)
+
+server.registerTool(
+  'build_guide',
+  {
+    description:
+      'Step-by-step build guide for this cage. Lengths, counts, and positions come from computeCage. Partial inputs are filled from the Marek 5×10 default. Warnings include the rough wind check.',
+    inputSchema,
+  },
+  async (args) => {
+    const result = computeCage(args as Partial<CageInputs>)
+    return text({ guide: result.guide, warnings: result.warnings, text: guidePlainText(result.guide) })
+  },
 )
 
 server.registerTool(

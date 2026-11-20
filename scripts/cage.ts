@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs'
 
 import { computeCage } from '../src/lib/compute.ts'
+import { guidePlainText } from '../src/lib/guide.ts'
 import { presetInputs, type CageInputs } from '../src/lib/model.ts'
 
 type Flags = Record<string, string | true>
@@ -85,6 +86,10 @@ function main(): void {
   }
 
   const result = computeCage(raw)
+  if (flags.guide === true) {
+    process.stdout.write(guidePlainText(result.guide))
+    return
+  }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`)
 }
 

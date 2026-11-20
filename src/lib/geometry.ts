@@ -188,7 +188,7 @@ export function layoutBeds(input: CageInputs): {
   return { beds, sideGap, bedLength: maxD, neededW, fit: fit && !overlap, overlap }
 }
 
-const NET_OVERLAP_M = 0.15
+export const NET_OVERLAP_M = 0.15
 const NET_PAST_END_M = 0.3
 const NET_STOCK = [
   { w: 4, l: 10 },
@@ -516,7 +516,7 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
   if (input.hoopSpacing > 1.2) {
     out.push({
       level: 'warn',
-      text: 'Hoop spacing over 1.2 m: net sags, possums walk it. 1.0 m is the default for this size; 0.8 m if the site is windy.',
+      text: 'Hoop spacing over 1.2 m: the net sags between hoops and a possum can walk it. 1.0 m holds it tighter; 0.8 m on a windy site.',
     })
   }
 

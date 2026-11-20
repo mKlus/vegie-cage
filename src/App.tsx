@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BomPanel } from './components/BomPanel'
+import { BuildGuide } from './components/BuildGuide'
 import { CageScene, type ViewId } from './components/CageScene'
 import { Controls, type BedDraft } from './components/Controls'
 import { Diagrams } from './components/Diagrams'
@@ -34,6 +35,7 @@ export default function App() {
   const [showNet, setShowNet] = useState(true)
   const [showMesh, setShowMesh] = useState(true)
   const [doorOpen, setDoorOpen] = useState(true)
+  const [board, setBoard] = useState<'bom' | 'guide'>('bom')
   const [ready, setReady] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placing, setPlacing] = useState(false)
@@ -335,7 +337,40 @@ export default function App() {
 
         <aside className="board">
           <Diagrams input={input} geo={geo} />
-          <BomPanel input={input} geo={geo} bom={bom} />
+          {result.warnings.length > 0 ? (
+            <ul className="warn-list">
+              {result.warnings.map((w) => (
+                <li key={w.text} className={w.level}>
+                  {w.text}
+                </li>
+              ))}
+            </ul>
+          ) : null}
+          <div className="board-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={board === 'bom'}
+              className={board === 'bom' ? 'is-on' : undefined}
+              onClick={() => setBoard('bom')}
+            >
+              Cut list
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={board === 'guide'}
+              className={board === 'guide' ? 'is-on' : undefined}
+              onClick={() => setBoard('guide')}
+            >
+              Build guide
+            </button>
+          </div>
+          {board === 'bom' ? (
+            <BomPanel input={input} geo={geo} bom={bom} />
+          ) : (
+            <BuildGuide steps={result.guide} />
+          )}
         </aside>
       </div>
     </div>

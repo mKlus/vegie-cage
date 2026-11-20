@@ -13,7 +13,7 @@ describe('buildArch', () => {
   })
 
   it('keeps the Marek 5 m hoop above a 1 m bend', () => {
-    const arch = buildArch(5, 1.55, 1.2)
+    const arch = buildArch(5, 1.8, 1.2)
     expect(arch.kind).toBe('elastica')
     expect(arch.belowElastica).toBe(false)
     expect(arch.minBendRadius).toBeGreaterThan(1)

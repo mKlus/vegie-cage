@@ -1,7 +1,7 @@
 import { type BomLine, bomPlainText, type BomResult } from '../lib/bom'
 import { formatM, formatM2, type CageInputs } from '../lib/model'
 import { formatAud } from '../lib/prices'
-import { warnings, type CageGeometry } from '../lib/geometry'
+import type { CageGeometry } from '../lib/geometry'
 import { useState } from 'react'
 
 type BomPanelProps = {
@@ -52,7 +52,6 @@ function BomTable({ title, total, lines }: { title: string; total: number; lines
 
 export function BomPanel({ input, geo, bom }: BomPanelProps) {
   const [copied, setCopied] = useState(false)
-  const notes = warnings(input, geo)
 
   async function copy() {
     const text = bomPlainText(input, bom)
@@ -67,16 +66,6 @@ export function BomPanel({ input, geo, bom }: BomPanelProps) {
 
   return (
     <div className="bom">
-      {notes.length > 0 ? (
-        <ul className="warn-list">
-          {notes.map((w) => (
-            <li key={w.text} className={w.level}>
-              {w.text}
-            </li>
-          ))}
-        </ul>
-      ) : null}
-
       <div className="totals">
         <div>
           <span>Hoop pipe</span>

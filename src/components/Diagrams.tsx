@@ -1,4 +1,5 @@
 import { BIRDIES_COLORS } from '../lib/birdies'
+import { RIDGE_PAST_END_M } from '../lib/fixings'
 import type { CageGeometry } from '../lib/geometry'
 import { SLEEPER, formatM, type CageInputs } from '../lib/model'
 
@@ -128,7 +129,7 @@ function SideElevation({ input, geo }: DiagramsProps) {
           className="d-mesh"
         />
         <path
-          d={`M${sx(-input.length / 2)} ${sy(geo.peakY)} L${sx(input.length / 2)} ${sy(geo.peakY)}`}
+          d={`M${sx(-input.length / 2 - RIDGE_PAST_END_M)} ${sy(geo.peakY)} L${sx(input.length / 2 + RIDGE_PAST_END_M)} ${sy(geo.peakY)}`}
           className="d-hoop"
         />
         {geo.hoopZs.map((z, i) => (

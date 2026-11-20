@@ -24,6 +24,7 @@ type ControlsHandle = {
   update: () => void
 }
 import { BIRDIES_COLORS } from '../lib/birdies'
+import { RIDGE_PAST_END_M } from '../lib/fixings'
 import { HOOP_MATERIAL, SLEEPER, WALL_MESH, type CageInputs } from '../lib/model'
 
 export type ViewId = 'iso' | 'end' | 'side' | 'top' | 'plan'
@@ -252,8 +253,8 @@ function CageModel({
     () =>
       new TubeGeometry(
         new CatmullRomCurve3([
-          new Vector3(0, geo.peakY, -input.length / 2),
-          new Vector3(0, geo.peakY, input.length / 2),
+          new Vector3(0, geo.peakY, -input.length / 2 - RIDGE_PAST_END_M),
+          new Vector3(0, geo.peakY, input.length / 2 + RIDGE_PAST_END_M),
         ]),
         2,
         pipeR * 0.85,

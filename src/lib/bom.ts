@@ -1,4 +1,17 @@
 import { bedLabel, bedSku, growingM2, soilM3 } from './birdies'
+import {
+  GUY_COUNT,
+  GUY_EACH_M,
+  HOG_SPACING_M,
+  PURLIN_TAIL_M,
+  RIDGE_PAST_END_M,
+  STAPLE_SPACING_M,
+  TIE_PER_CROSSING_M,
+  TIE_WIRE_STOCK_M,
+  pipeTakeoff,
+  saddleClipCount,
+  wireTakeoff,
+} from './fixings'
 import { buildGeometry, warnings, type CageGeometry } from './geometry'
 import {
   HOOP_MATERIAL,
@@ -108,10 +121,11 @@ export function buildBom(input: CageInputs): BomResult {
   const lines: BomLine[] = []
   const bedLines: BomLine[] = []
 
-  const hoopPipeM = geo.hoopCount * geo.pipeEachM
-  const ridgeM = input.length
-  const purlinPipeM = input.purlins === 3 && input.purlinMaterial === 'pipe' ? 2 * input.length : 0
-  const hoopTotalM = hoopPipeM + ridgeM + purlinPipeM
+  const pipe = pipeTakeoff(input, geo.hoopCount, geo.pipeEachM)
+  const hoopPipeM = pipe.hoopM
+  const ridgeM = pipe.ridgeM
+  const purlinPipeM = pipe.purlinPipeM
+  const hoopTotalM = pipe.totalM
 
   let hoopJoiners = 0
   if (hoop.stockKind === 'stick' && geo.pipeEachM > hoop.stockM) {
@@ -129,7 +143,7 @@ export function buildBom(input: CageInputs): BomResult {
         exact: `${geo.hoopCount} hoops × ${geo.pipeEachM.toFixed(2)} m = ${round1(hoopPipeM).toFixed(1)} m`,
         exactM: round2(hoopPipeM),
         buy: coilOrSticks(hoopPipeM, hoop.stockM, hoop.stockKind, hoopJoiners),
-        note: `${(geo.pipeInsertM * 1000).toFixed(0)} mm sleeve on the picket top (${geo.sleeveBot.toFixed(2)}–${geo.sleeveTop.toFixed(2)} m). Pipe stays vertical in the sleeve, then bends. Tightest radius ${geo.minBendRadius.toFixed(2)} m at the ${geo.bendAt}.`,
+        note: `${(geo.pipeInsertM * 1000).toFixed(0)} mm sleeve on the picket top (${geo.sleeveBot.toFixed(2)}–${geo.sleeveTop.toFixed(2)} m). Pipe stays vertical in the sleeve, then bends. Tightest radius ${geo.minBendRadius.toFixed(2)} m at the ${geo.bendAt}. Optional: a tek screw or hose clamp on each leg stops the hoop rattling in the sleeve.`,
       },
       0,
       0,
@@ -144,10 +158,10 @@ export function buildBom(input: CageInputs): BomResult {
         category: 'Frame',
         item: 'Ridge pipe',
         spec: hoop.label,
-        exact: `${ridgeM.toFixed(2)} m`,
+        exact: `${ridgeM.toFixed(2)} m (one length, ${(RIDGE_PAST_END_M * 1000).toFixed(0)} mm past each end hoop)`,
         exactM: round2(ridgeM),
-        buy: coilOrSticks(ridgeM, hoop.stockM, hoop.stockKind),
-        note: 'Zip-tie or saddle to every hoop peak. Stops the net sagging and the hoops walking.',
+        buy: 'One continuous length, cut from the hoop coil',
+        note: 'Sit the ridge under each hoop crossing. Figure-eight it with 2.5 mm tie wire, or use one saddle clip per hoop. Stops the net sagging and the hoops walking.',
       },
       0,
       0,
@@ -166,7 +180,7 @@ export function buildBom(input: CageInputs): BomResult {
           exact: `2 × ${input.length.toFixed(2)} m = ${purlinPipeM.toFixed(2)} m`,
           exactM: round2(purlinPipeM),
           buy: coilOrSticks(purlinPipeM, hoop.stockM, hoop.stockKind),
-          note: 'Pipe purlins halfway down each shoulder. On a wide span, wire purlins do the same job lighter.',
+          note: 'Pipe purlins midway between ridge and shoulder. Tie or saddle-clip to every hoop. Wire purlins do the same job lighter.',
         },
         0,
         0,
@@ -429,13 +443,12 @@ export function buildBom(input: CageInputs): BomResult {
     ),
   )
 
-  const lineCount = input.sleeperBase ? 2 : 3
-  const lineM = lineCount * geo.meshRunM * 1.05
-  const purlinWireM = input.purlins === 3 && input.purlinMaterial === 'wire' ? 2 * (input.length + 2) : 0
-  const guyCount = 4
-  const guyEach = 4
-  const guyM = guyCount * guyEach
-  const wireM = lineM + purlinWireM + guyM
+  const wire = wireTakeoff(input, geo.hoopCount, geo.meshRunM)
+  const lineCount = wire.lineCount
+  const lineM = wire.lineM
+  const purlinWireM = wire.purlinWireM
+  const guyM = wire.guyM
+  const wireM = wire.fencingM
   const wireBuy = cheapestWire(wireM)
 
   lines.push(
@@ -466,10 +479,10 @@ export function buildBom(input: CageInputs): BomResult {
           category: 'Frame',
           item: 'Wire purlins (2)',
           spec: '2.5 mm high-tensile, tensioned',
-          exact: `2 × ${(input.length + 2).toFixed(2)} m = ${purlinWireM.toFixed(1)} m`,
+          exact: `2 × ${wire.purlinEach.toFixed(2)} m = ${purlinWireM.toFixed(1)} m (${input.length.toFixed(2)} m run + ${PURLIN_TAIL_M.toFixed(2)} m tail each end)`,
           exactM: round2(purlinWireM),
-          buy: 'Included in the 2.5 mm coil',
-          note: 'Halfway down each shoulder, strained between the end hoops. Stops the net sailing between hoops.',
+          buy: 'Included in the 2.5 mm high-tensile coil',
+          note: 'One each side, midway between ridge and shoulder. Anchor both ends to the end bracing or a ground anchor. Tie to every hoop with 2.5 mm tie wire.',
         },
         0,
         0,
@@ -485,9 +498,9 @@ export function buildBom(input: CageInputs): BomResult {
         category: 'Frame',
         item: 'End guys',
         spec: '2.5 mm wire, diagonal, both end hoops',
-        exact: `${guyCount} × ${guyEach} m = ${guyM} m`,
+        exact: `${GUY_COUNT} × ${GUY_EACH_M} m = ${guyM} m`,
         exactM: guyM,
-        buy: 'Included in the 2.5 mm coil',
+        buy: 'Included in the 2.5 mm high-tensile coil',
         note: 'One pair on each end hoop, down to a ground anchor. These are the diagonal braces.',
       },
       0,
@@ -504,7 +517,7 @@ export function buildBom(input: CageInputs): BomResult {
         category: 'Frame',
         item: '2.5 mm fencing wire',
         spec: wireQuote.label,
-        exact: `${wireM.toFixed(1)} m (lines + purlins + guys)`,
+        exact: `${wireM.toFixed(1)} m (lines + purlins + guys, not tie wire)`,
         exactM: round2(wireM),
         buy: `${wireBuy.count} × ${wireBuy.stock} m coil${wireBuy.count === 1 ? '' : 's'}`,
         note: wireQuote.source,
@@ -522,12 +535,12 @@ export function buildBom(input: CageInputs): BomResult {
         category: 'Frame',
         item: 'Ground anchors',
         spec: anchor.label,
-        exact: `${guyCount} anchors`,
-        exactM: guyCount,
-        buy: `${guyCount} anchors`,
+        exact: `${GUY_COUNT} anchors`,
+        exactM: GUY_COUNT,
+        buy: `${GUY_COUNT} anchors`,
         note: 'One per guy, outside the end hoops.',
       },
-      guyCount,
+      GUY_COUNT,
       anchor.aud,
     ),
   )
@@ -636,28 +649,90 @@ export function buildBom(input: CageInputs): BomResult {
     )
   }
 
-  const zipTies = geo.hoopCount * (input.purlins + 8)
-  const tieBags = Math.ceil(zipTies / 100)
+  const tieCoils = ceilTo(wire.tieM, TIE_WIRE_STOCK_M)
+  const tieQuote = price('tie-wire-30')
+  lines.push(
+    moneyLine(
+      {
+        id: 'tie-wire',
+        category: 'Fixings',
+        item: 'Tie wire',
+        spec: '2.5 mm galvanised tie wire (soft)',
+        exact: `${wire.tieCount} figure-eights × ${TIE_PER_CROSSING_M.toFixed(1)} m = ${wire.tieM.toFixed(1)} m`,
+        exactM: round2(wire.tieM),
+        buy: `${tieCoils} × ${TIE_WIRE_STOCK_M} m coil${tieCoils === 1 ? '' : 's'}`,
+        note:
+          input.purlins === 3
+            ? 'Ridge and both purlins, at every hoop. Figure-eight, twist tight, fold the tails in. Not the high-tensile coil.'
+            : 'One figure-eight at each hoop on the ridge. Twist tight, fold the tails in. Not the high-tensile coil.',
+      },
+      tieCoils,
+      tieQuote.aud,
+    ),
+  )
+
+  const zipBags = Math.ceil(wire.tieCount / 100)
   const ties = price('ties-100')
   lines.push(
     moneyLine(
       {
         id: 'zips',
         category: 'Fixings',
-        item: 'UV cable ties',
-        spec: '200 × 4.8 mm black',
-        exact: `~${zipTies} ties`,
-        exactM: zipTies,
-        buy: `${tieBags * 100} ties (bags of 100)`,
-        note: 'Hoop-to-ridge, hoop-to-purlin, net-to-hoop. Snip tails so they do not punch the net.',
+        item: 'UV cable ties (optional)',
+        spec: 'UV-stabilised heavy-duty, 200 × 4.8 mm',
+        exact: `${wire.tieCount} ties, one per crossing`,
+        exactM: wire.tieCount,
+        buy: `${zipBags * 100} ties — only if you skip the tie wire`,
+        note: 'Optional alternative to the figure-eight tie wire. Not an extra, and not for the net. Snip tails.',
       },
-      tieBags,
+      zipBags,
       ties.aud,
+      false,
+    ),
+  )
+
+  const ridgeSaddles = saddleClipCount(geo.hoopCount, input.purlins, input.purlinMaterial)
+  const saddle = price('saddle')
+  lines.push(
+    moneyLine(
+      {
+        id: 'ridge-saddles',
+        category: 'Fixings',
+        item: 'Saddle clips (optional)',
+        spec: `${hoop.odMm} mm saddle clips`,
+        exact: `${ridgeSaddles} clips (one per pipe crossing)`,
+        exactM: ridgeSaddles,
+        buy: `${ridgeSaddles} clips — only if you skip tie wire at those crossings`,
+        note:
+          input.purlinMaterial === 'pipe' && input.purlins === 3
+            ? 'Optional in place of tie wire where the ridge and the pipe purlins cross a hoop. Not both.'
+            : 'Optional in place of tie wire at the ridge. One clip under each hoop. Wire purlins still use tie wire.',
+      },
+      ridgeSaddles,
+      saddle.aud,
+      false,
+    ),
+  )
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'sleeve-stops',
+        category: 'Fixings',
+        item: 'Sleeve stops (optional)',
+        spec: 'Tek screw or stainless hose clamp',
+        exact: `${geo.hoopCount * 2} (one per hoop leg)`,
+        exactM: geo.hoopCount * 2,
+        buy: 'Optional — not in the total',
+        note: 'Stops the hoop rattling in the picket sleeve. One tek screw through the poly into the picket, or a hose clamp.',
+      },
+      geo.hoopCount * 2,
+      0,
+      false,
     ),
   )
 
   if (input.postType !== 'star') {
-    const saddle = price('saddle')
     lines.push(
       moneyLine(
         {
@@ -677,7 +752,7 @@ export function buildBom(input: CageInputs): BomResult {
   }
 
   const stapleRun = input.sleeperBase ? sleeperRun : geo.meshRunM
-  const stapleCount = Math.ceil(stapleRun / 0.15)
+  const stapleCount = Math.ceil(stapleRun / STAPLE_SPACING_M)
   const stapleKg = Math.max(1, Math.ceil(stapleCount / STAPLES_PER_KG))
   const staples = price('staples-kg')
   lines.push(
@@ -699,9 +774,7 @@ export function buildBom(input: CageInputs): BomResult {
     ),
   )
 
-  const hogAlong = Math.ceil((lineCount * geo.meshRunM) / 0.2)
-  const hogNet = Math.ceil(geo.perimeterM / 0.15)
-  const hogCount = hogAlong + hogNet
+  const hogCount = Math.ceil((lineCount * geo.meshRunM) / HOG_SPACING_M)
   const hog = price('hog-500')
   const hogBoxes = ceilTo(hogCount, 500)
   lines.push(
@@ -711,10 +784,10 @@ export function buildBom(input: CageInputs): BomResult {
         category: 'Fixings',
         item: 'Hog rings',
         spec: '19 mm (3/4 in) galvanised',
-        exact: `~${hogCount} rings (${hogAlong} mesh-to-line, ${hogNet} net-to-wire)`,
+        exact: `~${hogCount} rings (chicken wire to the line wires)`,
         exactM: hogCount,
         buy: `${hogBoxes} × box of 500, plus hog-ring pliers`,
-        note: 'Every 200 mm on the line wires, every 150 mm where the net overlaps the wire.',
+        note: 'Chicken wire to the line wires only, every 200 mm. Not the net, and not the ridge. The net uses clips.',
       },
       hogBoxes,
       hog.aud,

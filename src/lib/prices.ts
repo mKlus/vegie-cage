@@ -62,6 +62,7 @@ export const PRICE_TABLE: PriceRow[] = [
   row('soil-m3', 'Bulk potting mix', 95, 'm³', UNVERIFIED, '2026-01-01', false),
   row('net-m2', 'Wildlife-safe knitted net', 2.4, 'm²', UNVERIFIED, '2026-01-01', false),
   row('ties-100', 'UV cable ties, bag of 100', 8, '100', UNVERIFIED, '2026-01-01', false),
+  row('tie-wire-30', '2.5 mm galvanised tie wire, 30 m', 14, '30 m', UNVERIFIED, '2026-01-01', false),
   row('saddle', 'Pipe saddle', 0.9, 'each', UNVERIFIED, '2026-01-01', false),
   row('staples-kg', 'Galvanised fence staples, 1 kg', 22, 'kg', UNVERIFIED, '2026-01-01', false),
   row('peg-50', 'Landscape staples, bag of 50', 14, '50', UNVERIFIED, '2026-01-01', false),

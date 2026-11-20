@@ -25,4 +25,14 @@ describe('windCheck', () => {
     expect(windCheck({ ...base, gustMs: 40 }).over).toBe(true)
     expect(windCheck({ ...base, gustMs: 20 }).over).toBe(false)
   })
+
+  it('raises per-picket load when the peak or the bay gets bigger', () => {
+    const low = windCheck({ ...base, gustMs: 40, peakY: 2.75, spacing: 1 })
+    const tall = windCheck({ ...base, gustMs: 40, peakY: 3, spacing: 1 })
+    const wide = windCheck({ ...base, gustMs: 40, peakY: 3, spacing: 1.25 })
+    expect(tall.forceN).toBeGreaterThan(low.forceN)
+    expect(wide.forceN).toBeCloseTo(tall.forceN * 1.25, 1)
+    expect(wide.momentNm).toBeGreaterThan(tall.momentNm)
+    expect(wide.over).toBe(true)
+  })
 })
