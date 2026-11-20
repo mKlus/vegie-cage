@@ -19,6 +19,14 @@ export type DoorWall = 'end' | 'side'
 export type PurlinSet = 1 | 3
 export type PurlinMaterial = 'pipe' | 'wire'
 export type SkirtMode = 'buried-vertical' | 'l-outward' | 'none'
+
+/** 200×50 H4 on edge. The 200 mm face is vertical: 150 mm in the trench, 50 mm above ground. */
+export const SLEEPER = {
+  faceM: 0.2,
+  thickM: 0.05,
+  buryM: 0.15,
+  revealM: 0.05,
+} as const
 export type PicketLength = 1.65 | 1.8 | 2.1 | 2.4
 
 export const PICKET_LENGTHS: readonly PicketLength[] = [1.65, 1.8, 2.1, 2.4]
@@ -74,7 +82,7 @@ export const DEFAULTS: CageInputs = {
   doorWall: 'end',
   doorWidth: 1,
   doorHeight: 2,
-  skirtMode: 'buried-vertical',
+  skirtMode: 'none',
   skirtDepth: 0.25,
   sleeperBase: true,
   picketLength: 1.8,
@@ -93,7 +101,7 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
   {
     id: 'marek-5x10',
     label: 'Marek 5×10',
-    note: '10 × 5 m. 1.8 m pickets driven 600 mm, 1.0 m wire, sleeve 1.0–1.2 m, 50 mm poly, wire purlins, buried skirt, 200×50 sleeper.',
+    note: '10 × 5 m. 1.8 m pickets driven 600 mm, 1.0 m wire from ground level, sleeve 1.0–1.2 m, 50 mm poly, wire purlins, no skirt, 200×50 sleeper 150 mm in / 50 mm up.',
     patch: {
       length: 10,
       width: 5,
@@ -110,7 +118,7 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       doorWall: 'end',
       doorWidth: 1,
       doorHeight: 2,
-      skirtMode: 'buried-vertical',
+      skirtMode: 'none',
       skirtDepth: 0.25,
       sleeperBase: true,
       picketLength: 1.8,

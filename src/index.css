@@ -239,6 +239,7 @@ button.is-on {
 .d-mesh { fill: rgba(143, 191, 74, 0.18); stroke: var(--leaf); stroke-width: 1; }
 .d-door { fill: rgba(196, 165, 116, 0.35); stroke: var(--timber); stroke-width: 1.4; }
 .d-post { stroke: #9aa3a8; stroke-width: 2; }
+.d-sleeper { fill: #8a6234; stroke: #5c3e1e; stroke-width: 0.6; }
 .d-sleeve { fill: #1f3d2a; stroke: #c8e08a; stroke-width: 1; }
 .d-swing { fill: none; stroke: var(--timber); stroke-width: 1.2; stroke-dasharray: 3 2; }
 .d-outline { fill: none; stroke: var(--ink); stroke-width: 1.4; }

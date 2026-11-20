@@ -10,6 +10,7 @@ import {
 import {
   HOOP_MATERIAL,
   LIMITS,
+  SLEEPER,
   PICKET_LENGTHS,
   POST_TYPE,
   PRESETS,
@@ -430,7 +431,7 @@ export function Controls({
           </select>
         </label>
         <label className="select">
-          Buried skirt
+          Skirt
           <select
             value={input.skirtMode}
             onChange={(e) => patch({ skirtMode: e.target.value as SkirtMode })}
@@ -449,7 +450,7 @@ export function Controls({
             checked={input.sleeperBase}
             onChange={(e) => patch({ sleeperBase: e.target.checked })}
           />
-          200×50 H4 sleeper on the outside base
+          {`200×50 H4 sleeper, ${Math.round(SLEEPER.buryM * 1000)} mm in the ground, ${Math.round(SLEEPER.revealM * 1000)} mm above`}
         </label>
       </section>
 

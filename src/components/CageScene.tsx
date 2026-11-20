@@ -24,7 +24,7 @@ type ControlsHandle = {
   update: () => void
 }
 import { BIRDIES_COLORS } from '../lib/birdies'
-import { HOOP_MATERIAL, WALL_MESH, type CageInputs } from '../lib/model'
+import { HOOP_MATERIAL, SLEEPER, WALL_MESH, type CageInputs } from '../lib/model'
 
 export type ViewId = 'iso' | 'end' | 'side' | 'top' | 'plan'
 
@@ -102,9 +102,9 @@ function endWallGeometry(
 }
 
 function Sleeper({ input }: { input: CageInputs }) {
-  const t = 0.05
-  const h = 0.2
-  const y = 0
+  const t = SLEEPER.thickM
+  const h = SLEEPER.faceM
+  const y = (SLEEPER.revealM - SLEEPER.buryM) / 2
   const colour = '#6b4a28'
   const sideX = input.width / 2 + t / 2
   const endZ = input.length / 2 + t / 2

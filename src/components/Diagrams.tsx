@@ -1,6 +1,6 @@
 import { BIRDIES_COLORS } from '../lib/birdies'
 import type { CageGeometry } from '../lib/geometry'
-import { formatM, type CageInputs } from '../lib/model'
+import { SLEEPER, formatM, type CageInputs } from '../lib/model'
 
 type DiagramsProps = {
   input: CageInputs
@@ -38,6 +38,24 @@ function EndElevation({ input, geo }: DiagramsProps) {
       <figcaption>End (door)</figcaption>
       <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="End elevation">
         <line x1={sx(-input.width / 2)} y1={sy(0)} x2={sx(input.width / 2)} y2={sy(0)} className="d-ground" />
+        {input.sleeperBase ? (
+          <>
+            <rect
+              x={sx(-postX - SLEEPER.thickM)}
+              y={sy(SLEEPER.revealM)}
+              width={SLEEPER.thickM * s}
+              height={SLEEPER.faceM * s}
+              className="d-sleeper"
+            />
+            <rect
+              x={sx(postX)}
+              y={sy(SLEEPER.revealM)}
+              width={SLEEPER.thickM * s}
+              height={SLEEPER.faceM * s}
+              className="d-sleeper"
+            />
+          </>
+        ) : null}
         <line x1={sx(-postX)} y1={sy(-geo.embedDepth)} x2={sx(-postX)} y2={sy(geo.hoopStartY)} className="d-post" />
         <line x1={sx(postX)} y1={sy(-geo.embedDepth)} x2={sx(postX)} y2={sy(geo.hoopStartY)} className="d-post" />
         <rect
@@ -93,6 +111,15 @@ function SideElevation({ input, geo }: DiagramsProps) {
       <figcaption>Side</figcaption>
       <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="Side elevation">
         <line x1={sx(-input.length / 2)} y1={sy(0)} x2={sx(input.length / 2)} y2={sy(0)} className="d-ground" />
+        {input.sleeperBase ? (
+          <rect
+            x={sx(-input.length / 2)}
+            y={sy(SLEEPER.revealM)}
+            width={input.length * s}
+            height={SLEEPER.faceM * s}
+            className="d-sleeper"
+          />
+        ) : null}
         <rect
           x={sx(-input.length / 2)}
           y={sy(input.meshHeight)}

@@ -83,7 +83,7 @@ export function BomPanel({ input, geo, bom }: BomPanelProps) {
           <strong>{formatM(bom.totals.hoopPipeM, 1)}</strong>
         </div>
         <div>
-          <span>Wall + apron mesh</span>
+          <span>{input.skirtMode === 'none' ? 'Wall mesh' : 'Wall + apron mesh'}</span>
           <strong>{formatM(bom.totals.meshM, 1)}</strong>
         </div>
         <div>

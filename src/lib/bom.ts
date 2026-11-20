@@ -3,6 +3,7 @@ import { buildGeometry, warnings, type CageGeometry } from './geometry'
 import {
   HOOP_MATERIAL,
   POST_TYPE,
+  SLEEPER,
   WALL_MESH,
   type CageInputs,
   round1,
@@ -285,7 +286,7 @@ export function buildBom(input: CageInputs): BomResult {
           exact: `${sleeperRun.toFixed(2)} m outside the pickets, door gap left open`,
           exactM: round2(sleeperRun),
           buy: `${sticks} × ${SLEEPER_STOCK_M} m`,
-          note: '200 × 50 on edge: about 100 mm in the ground, 100 mm above. Fix to the pickets. Staple the wire to the face.',
+          note: `200 × 50 on edge: ${(SLEEPER.buryM * 1000).toFixed(0)} mm in the ground, ${(SLEEPER.revealM * 1000).toFixed(0)} mm above. Fix to the pickets. Staple the wire to the face from ground level.`,
         },
         sticks,
         sleeper.aud,
@@ -307,7 +308,9 @@ export function buildBom(input: CageInputs): BomResult {
         exact: `${wallMeshM.toFixed(2)} m run × ${input.meshHeight.toFixed(2)} m high (${(wallMeshM * input.meshHeight).toFixed(1)} m²)`,
         exactM: round2(wallMeshM),
         buy: `${wallRoll.count} × ${meshHeightStock.toFixed(1)} m × ${wallRoll.size} m roll${wallRoll.count === 1 ? '' : 's'}`,
-        note: `Wire height is independent of the sleeve. Perimeter ${geo.perimeterM.toFixed(2)} m minus the ${input.doorWidth.toFixed(2)} m door, plus joins.`,
+        note: input.sleeperBase
+          ? `From ground level to ${input.meshHeight.toFixed(2)} m, stapled to the sleeper face. Perimeter ${geo.perimeterM.toFixed(2)} m minus the ${input.doorWidth.toFixed(2)} m door, plus joins.`
+          : `Wire height is independent of the sleeve. Perimeter ${geo.perimeterM.toFixed(2)} m minus the ${input.doorWidth.toFixed(2)} m door, plus joins.`,
       },
       wallRoll.count,
       meshRollAud(mesh.apertureMm, meshHeightStock, wallRoll.size),
@@ -446,7 +449,7 @@ export function buildBom(input: CageInputs): BomResult {
         exactM: round2(lineM),
         buy: 'Included in the 2.5 mm coil',
         note: input.sleeperBase
-          ? 'Mid and top of the wire. The bottom is stapled to the sleeper, so no bottom line wire.'
+          ? 'Mid and top of the wire. The bottom sits at ground level and is stapled to the sleeper face, so no bottom line wire.'
           : 'Bottom, mid, and top. Hog-ring the mesh to each line.',
       },
       0,
@@ -688,7 +691,7 @@ export function buildBom(input: CageInputs): BomResult {
         exactM: stapleCount,
         buy: `${stapleKg} kg`,
         note: input.sleeperBase
-          ? 'Staple the wire to the sleeper face every 150 mm.'
+          ? `Staple the wire to the sleeper face every 150 mm. The ${(input.meshHeight * 1000).toFixed(0)} mm wire starts at ground level, on the ${(SLEEPER.revealM * 1000).toFixed(0)} mm above the trench.`
           : 'Staple mesh every 150 mm on the rails.',
       },
       stapleKg,

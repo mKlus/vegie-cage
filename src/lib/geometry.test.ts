@@ -84,6 +84,7 @@ describe('buildGeometry', () => {
     const marek = warnings(DEFAULTS, buildGeometry(DEFAULTS))
     expect(marek.some((w) => /one-third/.test(w.text))).toBe(false)
     expect(marek.some((w) => /sleeve/.test(w.text) && w.level === 'bad')).toBe(false)
+    expect(marek.some((w) => w.level === 'info' && /rabbit or fox/.test(w.text) && /150 mm/.test(w.text))).toBe(true)
     expect(marek.some((w) => /50 mm mesh/.test(w.text))).toBe(true)
     expect(marek.some((w) => /not engineering/.test(w.text))).toBe(true)
   })

@@ -2,7 +2,7 @@
 
 Walk-in vegetable garden enclosure planner. Lower mesh fence, poly (or galv) U-hoops, taut wildlife-safe net, full-size door, raised timber beds. Live 3D + elevations, metre-exact cut list for Mitre 10 / steel supply lengths.
 
-Default preset **Marek 5×10**: 10 × 5 m, 1.8 m star pickets driven 600 mm (1.2 m stick-up), 1.0 m chicken wire stopping where the 200 mm sleeve starts, buried skirt, 200×50 H4 sleeper, 11 hoops of 50 mm rural poly, wire purlins, wildlife-safe net. The older 12 × 6 m walk-in is still a preset.
+Default preset **Marek 5×10**: 10 × 5 m, 1.8 m star pickets driven 600 mm (1.2 m stick-up), 1.0 m chicken wire from ground level up to the sleeve, no skirt, 200×50 H4 sleeper (150 mm in the ground, 50 mm above), 11 hoops of 50 mm rural poly, wire purlins, wildlife-safe net. A buried skirt is still an option. The older 12 × 6 m walk-in is still a preset.
 
 ```bash
 npm install

@@ -12,7 +12,7 @@ describe('share links', () => {
     expect(back?.embedDepth).toBeCloseTo(0.6)
     expect(back?.meshHeight).toBe(1)
     expect(back?.pipeInsert).toBeCloseTo(0.2)
-    expect(back?.skirtMode).toBe('buried-vertical')
+    expect(back?.skirtMode).toBe('none')
     expect(back?.sleeperBase).toBe(true)
     expect(back?.purlinMaterial).toBe('wire')
     expect(back?.windGust).toBe(40)

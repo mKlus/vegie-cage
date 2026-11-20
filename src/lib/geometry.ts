@@ -1,6 +1,6 @@
 import { archShoulderPoint, buildArch } from './arch'
 import { bedBox, bedFootprint, bedInsideCage, boxesOverlap, type PlacedBed } from './birdies'
-import { frameHeights, HOOP_MATERIAL, STAR_ACROSS_MM, WALL_MESH, type CageInputs, round2 } from './model'
+import { frameHeights, HOOP_MATERIAL, SLEEPER, STAR_ACROSS_MM, WALL_MESH, type CageInputs, round2 } from './model'
 import { windCheck, type WindCheck } from './wind'
 
 export type ExtraPost = { x: number; z: number; capped: boolean; role: 'end' | 'jamb' | 'stay' }
@@ -548,7 +548,12 @@ export function warnings(input: CageInputs, geo: CageGeometry): Warning[] {
     })
   }
 
-  if (input.skirtMode === 'none' || input.skirtDepth < 0.2) {
+  if (input.skirtMode === 'none' && input.sleeperBase) {
+    out.push({
+      level: 'info',
+      text: `No skirt. A determined rabbit or fox can dig under a ${(SLEEPER.buryM * 1000).toFixed(0)} mm-deep sleeper.`,
+    })
+  } else if (input.skirtMode === 'none' || input.skirtDepth < 0.2) {
     out.push({
       level: 'warn',
       text: 'Skirt under 200 mm. Rabbits and dogs go under. Bury a vertical skirt, or fold an L outward, 200–300 mm.',
