@@ -96,14 +96,22 @@ describe('buildBom', () => {
     expect(wall?.buy).toMatch(/roll/)
   })
 
-  it('lists four owned Birdies beds and soil volume', () => {
+  it('bills only the four non-owned 61×305 beds', () => {
     const bom = buildBom(DEFAULTS)
-    const row = bom.bedLines.find((l) => l.id === 'birdies-1')
-    expect(row?.buy).toMatch(/owned/)
-    expect(row?.exact).toMatch(/4 bed/)
-    expect(row?.inTotal).toBe(false)
-    expect(bom.totals.soilM3).toBeGreaterThan(4)
-    expect(bom.totals.growM2).toBeCloseTo(4 * 1.22 * 2.44, 1)
+    const billed = bom.bedLines.filter((l) => /^birdies-\d+$/.test(l.id) && l.inTotal)
+    expect(billed).toHaveLength(1)
+    expect(billed[0]?.qty).toBe(4)
+    expect(billed[0]?.buy).toMatch(/4 to buy/)
+    expect(billed[0]?.buy).toMatch(/2 already owned/)
+    expect(billed[0]?.item).toMatch(/61 cm × 305 cm/)
+    expect(billed[0]?.lineAud).toBeCloseTo(4 * birdiesBedAud(0.61, 3.05, 0.37), 2)
+    const owned122 = bom.bedLines.find((l) => l.item.includes('122 cm × 244 cm'))
+    expect(owned122?.inTotal).toBe(false)
+    expect(owned122?.buy).toMatch(/2 owned — none to buy/)
+    const wall = 6 * 0.61 * 3.05
+    const mid = 2 * 1.22 * 2.44
+    expect(bom.totals.growM2).toBeCloseTo(wall + mid, 1)
+    expect(bom.totals.soilM3).toBeCloseTo((wall + mid) * 0.37, 1)
   })
 
   it('plain numbers stay in metres', () => {
@@ -112,29 +120,35 @@ describe('buildBom', () => {
     expect(bom.totals.netM2).toBeGreaterThan(80)
   })
 
-  it('prices cage separately from owned Birdies (soil only)', () => {
+  it('prices the cage list apart from the Birdies list', () => {
     const bom = buildBom(DEFAULTS)
     expect(bom.lines.some((l) => l.id.startsWith('birdies') || l.id === 'soil')).toBe(false)
     expect(bom.totals.cageAud).toBeGreaterThan(200)
     const soil = bom.bedLines.find((l) => l.id === 'soil')
+    const buy = bom.bedLines.find((l) => l.id.startsWith('birdies-') && l.inTotal)
+    const ship = bom.bedLines.find((l) => l.id === 'birdies-ship')
     expect(soil?.inTotal).toBe(true)
-    expect(bom.totals.bedsAud).toBeCloseTo(soil!.lineAud, 2)
-    expect(bom.bedLines.find((l) => l.id === 'birdies-ship')).toBeUndefined()
+    expect(buy?.qty).toBe(4)
+    expect(ship?.lineAud).toBe(BIRDIES_SHIP_AUD)
+    expect(bom.totals.bedsAud).toBeCloseTo(buy!.lineAud + soil!.lineAud + BIRDIES_SHIP_AUD, 2)
     const hoopLot = bom.lines.find((l) => l.id === 'hoop-pipe')
     expect(hoopLot?.inTotal).toBe(true)
     expect(hoopLot!.lineAud).toBeGreaterThan(0)
   })
 
   it('prices unowned Birdies beds on the beds list only', () => {
+    const owned = makeBed({ ...OWNED_BIRDIE, owned: true, id: 'owned-x', x: 2, z: 0, rot: 0 })
     const extra = makeBed({ ...OWNED_BIRDIE, owned: false, x: 0, z: 0, rot: 0 })
-    const bom = buildBom({ ...DEFAULTS, beds: [...DEFAULTS.beds, extra] })
+    const bom = buildBom({ ...DEFAULTS, beds: [owned, extra] })
     const buy = bom.bedLines.find((l) => l.id.startsWith('birdies-') && l.inTotal)
     expect(buy?.qty).toBe(1)
+    expect(buy?.buy).toMatch(/1 to buy/)
+    expect(buy?.buy).toMatch(/1 already owned/)
     expect(buy?.lineAud).toBeCloseTo(birdiesBedAud(1.22, 2.44, 0.37), 2)
     expect(bom.bedLines.find((l) => l.id === 'birdies-ship')?.lineAud).toBe(BIRDIES_SHIP_AUD)
     const soil = bom.bedLines.find((l) => l.id === 'soil')
     expect(bom.totals.bedsAud).toBeCloseTo(buy!.lineAud + soil!.lineAud + BIRDIES_SHIP_AUD, 2)
     expect(bom.lines.every((l) => !l.id.startsWith('birdies'))).toBe(true)
-    expect(soil?.lineAud).toBeCloseTo(5 * 1.22 * 2.44 * 0.37 * SOIL_M3_AUD, 0)
+    expect(soil?.lineAud).toBeCloseTo(2 * 1.22 * 2.44 * 0.37 * SOIL_M3_AUD, 0)
   })
 })

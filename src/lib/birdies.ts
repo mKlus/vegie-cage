@@ -103,6 +103,39 @@ export function makeBed(partial: Partial<PlacedBed> & Pick<PlacedBed, 'x' | 'z'>
   }
 }
 
+/**
+ * Marek's 10 × 4.6 m plan. Door at z = -5 on the centreline, opening outward.
+ * Six 61×305 along the long walls, three per side, 0.20 m apart and 0.225 m off each end.
+ * Two 122×244 on the centreline toward the far end, 1.21 m apart, far bed 0.23 m off the end wall.
+ * Owned: both 122×244 and the two 61×305 nearest the door (two kits were cut down).
+ * L is -x, R is +x, index 1 is the door end.
+ */
+export function marekBeds(): PlacedBed[] {
+  const base = {
+    brand: 'birdies' as const,
+    height: 0.37,
+    color: OWNED_BIRDIE.color,
+    rot: 0 as const,
+  }
+  const wall = { ...base, width: 0.61, length: 3.05 }
+  const mid = { ...base, width: 1.22, length: 2.44 }
+  const stations = [
+    { n: 1, z: -3.25, owned: true },
+    { n: 2, z: 0, owned: false },
+    { n: 3, z: 3.25, owned: false },
+  ]
+  const along = (side: 'L' | 'R', x: number): PlacedBed[] =>
+    stations.map(({ n, z, owned }) =>
+      makeBed({ ...wall, id: `wall-${side}${n}`, x: snap(x), z: snap(z), owned }),
+    )
+  return [
+    ...along('L', -1.75),
+    ...along('R', 1.75),
+    makeBed({ ...mid, id: 'mid-1', x: snap(0), z: snap(-0.1), owned: true }),
+    makeBed({ ...mid, id: 'mid-2', x: snap(0), z: snap(3.55), owned: true }),
+  ]
+}
+
 /** 2×2 of the four owned 122×244×37 beds, centre path, door clearance. */
 export function packOwnedFour(cageLength: number, cageWidth: number): PlacedBed[] {
   const W = OWNED_BIRDIE.width

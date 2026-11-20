@@ -1,4 +1,4 @@
-import { makeBed, packOwnedFour, sanitiseBed, type PlacedBed } from './birdies'
+import { makeBed, marekBeds, packOwnedFour, sanitiseBed, type PlacedBed } from './birdies'
 import {
   DEFAULT_AISLE_DOOR,
   DEFAULT_AISLE_WALK,
@@ -127,7 +127,7 @@ export const DEFAULTS: CageInputs = {
   windGust: 40,
   design: 'v2',
   cover: 'bird-net',
-  beds: packOwnedFour(10, 4.6),
+  beds: marekBeds(),
 }
 
 export const PRESETS: { id: string; label: string; note: string; patch: Partial<CageInputs> }[] = [
@@ -163,7 +163,7 @@ export const PRESETS: { id: string; label: string; note: string; patch: Partial<
       windGust: 40,
       design: 'v2',
       cover: 'bird-net',
-      beds: packOwnedFour(10, 4.6),
+      beds: marekBeds(),
     },
   },
   {

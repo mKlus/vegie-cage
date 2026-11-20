@@ -23,7 +23,7 @@ describe('share links', () => {
     expect(back?.sleeperBase).toBe(true)
     expect(back?.purlinMaterial).toBe('wire')
     expect(back?.windGust).toBe(40)
-    expect(back?.beds).toHaveLength(4)
+    expect(back?.beds).toHaveLength(8)
   })
 
   it('does not replaceState when the URL already decodes to these settings', () => {
