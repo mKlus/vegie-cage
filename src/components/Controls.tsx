@@ -10,16 +10,21 @@ import {
 import {
   HOOP_MATERIAL,
   LIMITS,
+  PICKET_LENGTHS,
   POST_TYPE,
   PRESETS,
   WALL_MESH,
   formatM,
+  frameHeights,
   type CageInputs,
   type HoopMaterial,
   type HoopOrigin,
   type NetType,
+  type PicketLength,
   type PostType,
+  type PurlinMaterial,
   type PurlinSet,
+  type SkirtMode,
   type WallMesh,
 } from '../lib/model'
 
@@ -71,7 +76,7 @@ function Slider({
       <span>
         {label}
         <em>
-          {typeof value === 'number' && unit === 'm' ? formatM(value, 2) : value}
+          {typeof value === 'number' && unit === 'm' ? formatM(value, value >= 10 && lim.step >= 1 ? 0 : 2) : `${value}${unit === 'm' ? '' : ` ${unit}`}`}
         </em>
       </span>
       <input
@@ -382,9 +387,22 @@ export function Controls({
 
       <section>
         <h2>Fence</h2>
-        <Slider label="Mesh / post height" field="meshHeight" input={input} patch={patch} />
-        <Slider label="Dig apron" field="apron" input={input} patch={patch} />
-        <Slider label="Bury mesh" field="bury" input={input} patch={patch} />
+        <Slider label="Wire height" field="meshHeight" input={input} patch={patch} />
+        <label className="select">
+          Picket / post length
+          <select
+            value={String(input.picketLength)}
+            onChange={(e) => patch({ picketLength: Number(e.target.value) as PicketLength })}
+          >
+            {PICKET_LENGTHS.map((m) => (
+              <option key={m} value={m}>
+                {formatM(m, 2)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <Slider label="Embed depth" field="embedDepth" input={input} patch={patch} />
+        <FrameHint input={input} />
         <label className="select">
           Wall mesh
           <select
@@ -411,6 +429,28 @@ export function Controls({
             ))}
           </select>
         </label>
+        <label className="select">
+          Buried skirt
+          <select
+            value={input.skirtMode}
+            onChange={(e) => patch({ skirtMode: e.target.value as SkirtMode })}
+          >
+            <option value="buried-vertical">Buried vertical</option>
+            <option value="l-outward">L folded outward</option>
+            <option value="none">None</option>
+          </select>
+        </label>
+        {input.skirtMode === 'none' ? null : (
+          <Slider label="Skirt depth" field="skirtDepth" input={input} patch={patch} />
+        )}
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={input.sleeperBase}
+            onChange={(e) => patch({ sleeperBase: e.target.checked })}
+          />
+          200×50 H4 sleeper on the outside base
+        </label>
       </section>
 
       <section>
@@ -422,14 +462,14 @@ export function Controls({
             value={input.hoopOrigin}
             onChange={(e) => patch({ hoopOrigin: e.target.value as HoopOrigin })}
           >
-            <option value="ground">Over posts, from the ground (stronger at 6 m)</option>
-            <option value="rail">U from the post tops (your first sketch)</option>
+            <option value="ground">Sleeved over the picket tops</option>
+            <option value="rail">Saddle-clipped to a top rail</option>
           </select>
         </label>
-        <Slider label="Sleeve on post" field="pipeInsert" input={input} patch={patch} />
+        <Slider label="Sleeve on picket" field="pipeInsert" input={input} patch={patch} />
         <p className="hint">
-          Pipe slides onto the post for {(input.pipeInsert * 1000).toFixed(0)} mm. Ground: sleeve from soil up.
-          Rail: sleeve down over the post top.
+          Pipe slides {(input.pipeInsert * 1000).toFixed(0)} mm over the picket top and stays vertical there.
+          The wire must stop at the bottom of that sleeve.
         </p>
         <label className="select">
           Hoop pipe
@@ -454,6 +494,22 @@ export function Controls({
             <option value="3">Ridge + two side purlins</option>
           </select>
         </label>
+        {input.purlins === 3 ? (
+          <label className="select">
+            Purlin material
+            <select
+              value={input.purlinMaterial}
+              onChange={(e) => patch({ purlinMaterial: e.target.value as PurlinMaterial })}
+            >
+              <option value="wire">2.5 mm tensioned wire</option>
+              <option value="pipe">Same pipe as the hoops</option>
+            </select>
+          </label>
+        ) : null}
+        <Slider label="Design gust" field="windGust" input={input} patch={patch} unit="m/s" />
+        <p className="hint">
+          Rough wind check only, not engineering. Default 40 m/s. Net is taken as about 35% solid.
+        </p>
         <label className="select">
           Net
           <select
@@ -472,6 +528,18 @@ export function Controls({
         <Slider label="Door height" field="doorHeight" input={input} patch={patch} />
       </section>
     </div>
+  )
+}
+
+function FrameHint({ input }: { input: CageInputs }) {
+  const frame = frameHeights(input)
+  const third = input.picketLength / 3
+  return (
+    <p className="hint">
+      Stick-up {formatM(frame.stickUp, 2)}. Sleeve {Math.round(frame.sleeveBot * 1000)}–
+      {Math.round(frame.sleeveTop * 1000)} mm. One-third of this picket is {formatM(third, 2)}.
+      {frame.overlaps ? ' Wire currently runs into the sleeve.' : ''}
+    </p>
   )
 }
 

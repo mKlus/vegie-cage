@@ -25,7 +25,7 @@ function EndElevation({ input, geo }: DiagramsProps) {
   const pad = 28
   const w = 320
   const h = 200
-  const maxY = input.peakHeight
+  const maxY = Math.max(input.peakHeight, geo.peakY)
   const s = Math.min((w - pad * 2) / input.width, (h - pad * 2) / maxY)
   const sx = (x: number) => w / 2 + x * s
   const sy = (y: number) => h - pad - y * s
@@ -38,8 +38,8 @@ function EndElevation({ input, geo }: DiagramsProps) {
       <figcaption>End (door)</figcaption>
       <svg viewBox={`0 0 ${w} ${h}`} role="img" aria-label="End elevation">
         <line x1={sx(-input.width / 2)} y1={sy(0)} x2={sx(input.width / 2)} y2={sy(0)} className="d-ground" />
-        <line x1={sx(-postX)} y1={sy(-0.25)} x2={sx(-postX)} y2={sy(geo.hoopStartY)} className="d-post" />
-        <line x1={sx(postX)} y1={sy(-0.25)} x2={sx(postX)} y2={sy(geo.hoopStartY)} className="d-post" />
+        <line x1={sx(-postX)} y1={sy(-geo.embedDepth)} x2={sx(-postX)} y2={sy(geo.hoopStartY)} className="d-post" />
+        <line x1={sx(postX)} y1={sy(-geo.embedDepth)} x2={sx(postX)} y2={sy(geo.hoopStartY)} className="d-post" />
         <rect
           x={sx(-postX) - 4}
           y={sy(geo.hoopStartY)}
@@ -74,7 +74,7 @@ function EndElevation({ input, geo }: DiagramsProps) {
           className="d-swing"
         />
         <text x={w / 2} y={h - 8} className="d-label" textAnchor="middle">
-          {formatM(input.width, 1)} wide · sleeve {(sleeveH * 1000).toFixed(0)} mm on post · door swings out
+          {formatM(input.width, 1)} wide · stick-up {formatM(geo.stickUp, 2)} · sleeve {(sleeveH * 1000).toFixed(0)} mm · bend {formatM(geo.minBendRadius, 2)}
         </text>
       </svg>
     </figure>
@@ -85,7 +85,7 @@ function SideElevation({ input, geo }: DiagramsProps) {
   const pad = 28
   const w = 320
   const h = 160
-  const s = Math.min((w - pad * 2) / input.length, (h - pad * 2) / input.peakHeight)
+  const s = Math.min((w - pad * 2) / input.length, (h - pad * 2) / geo.peakY)
   const sx = (z: number) => pad + (z + input.length / 2) * s
   const sy = (y: number) => h - pad - y * s
   return (
@@ -101,7 +101,7 @@ function SideElevation({ input, geo }: DiagramsProps) {
           className="d-mesh"
         />
         <path
-          d={`M${sx(-input.length / 2)} ${sy(input.peakHeight)} L${sx(input.length / 2)} ${sy(input.peakHeight)}`}
+          d={`M${sx(-input.length / 2)} ${sy(geo.peakY)} L${sx(input.length / 2)} ${sy(geo.peakY)}`}
           className="d-hoop"
         />
         {geo.hoopZs.map((z, i) => (
@@ -110,7 +110,7 @@ function SideElevation({ input, geo }: DiagramsProps) {
             x1={sx(z)}
             y1={sy(0)}
             x2={sx(z)}
-            y2={sy(input.peakHeight)}
+            y2={sy(geo.hoopStartY)}
             className="d-post"
           />
         ))}

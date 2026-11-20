@@ -95,6 +95,14 @@ export function BomPanel({ input, geo, bom }: BomPanelProps) {
           <strong>{formatM(geo.pipeEachM, 2)}</strong>
         </div>
         <div>
+          <span>Stick-up</span>
+          <strong>{formatM(geo.stickUp, 2)}</strong>
+        </div>
+        <div>
+          <span>Tightest bend</span>
+          <strong>{formatM(geo.minBendRadius, 2)}</strong>
+        </div>
+        <div>
           <span>Beds / soil</span>
           <strong>
             {input.beds.length} · {bom.totals.soilM3.toFixed(1)} m³

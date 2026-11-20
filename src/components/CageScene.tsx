@@ -17,7 +17,7 @@ import {
   TubeGeometry,
   Vector3,
 } from 'three'
-import { hoopPointAt, type CageGeometry, type Point } from '../lib/geometry'
+import type { CageGeometry, Point } from '../lib/geometry'
 
 type ControlsHandle = {
   target: Vector3
@@ -99,6 +99,56 @@ function endWallGeometry(
     shape.holes.push(hole)
   }
   return new ShapeGeometry(shape, 8)
+}
+
+function Sleeper({ input }: { input: CageInputs }) {
+  const t = 0.05
+  const h = 0.2
+  const y = 0
+  const colour = '#6b4a28'
+  const sideX = input.width / 2 + t / 2
+  const endZ = input.length / 2 + t / 2
+  const doorOnEnd = input.doorWall === 'end'
+  const sideW = Math.max(0.2, (input.width - input.doorWidth) / 2)
+  return (
+    <group>
+      <mesh position={[sideX, y, 0]}>
+        <boxGeometry args={[t, h, input.length]} />
+        <meshStandardMaterial color={colour} />
+      </mesh>
+      <mesh position={[-sideX, y, 0]}>
+        <boxGeometry args={[t, h, input.length]} />
+        <meshStandardMaterial color={colour} />
+      </mesh>
+      {doorOnEnd ? (
+        <>
+          <mesh position={[-(input.doorWidth / 2 + sideW / 2), y, -endZ]}>
+            <boxGeometry args={[sideW, h, t]} />
+            <meshStandardMaterial color={colour} />
+          </mesh>
+          <mesh position={[input.doorWidth / 2 + sideW / 2, y, -endZ]}>
+            <boxGeometry args={[sideW, h, t]} />
+            <meshStandardMaterial color={colour} />
+          </mesh>
+          <mesh position={[0, y, endZ]}>
+            <boxGeometry args={[input.width + t * 2, h, t]} />
+            <meshStandardMaterial color={colour} />
+          </mesh>
+        </>
+      ) : (
+        <>
+          <mesh position={[0, y, endZ]}>
+            <boxGeometry args={[input.width + t * 2, h, t]} />
+            <meshStandardMaterial color={colour} />
+          </mesh>
+          <mesh position={[0, y, -endZ]}>
+            <boxGeometry args={[input.width + t * 2, h, t]} />
+            <meshStandardMaterial color={colour} />
+          </mesh>
+        </>
+      )}
+    </group>
+  )
 }
 
 function CameraRig({
@@ -202,32 +252,32 @@ function CageModel({
     () =>
       new TubeGeometry(
         new CatmullRomCurve3([
-          new Vector3(0, input.peakHeight, -input.length / 2),
-          new Vector3(0, input.peakHeight, input.length / 2),
+          new Vector3(0, geo.peakY, -input.length / 2),
+          new Vector3(0, geo.peakY, input.length / 2),
         ]),
         2,
         pipeR * 0.85,
         6,
         false,
       ),
-    [input.peakHeight, input.length, pipeR],
+    [geo.peakY, input.length, pipeR],
   )
   const purlinGeoms = useMemo(() => {
-    if (input.purlins !== 3) return []
-    return [0.55, -0.55].map((t) => {
-      const p = hoopPointAt(geo.span, geo.rise, geo.hoopStartY, t)
-      return new TubeGeometry(
-        new CatmullRomCurve3([
-          new Vector3(p.x, p.y, -input.length / 2),
-          new Vector3(p.x, p.y, input.length / 2),
-        ]),
-        2,
-        pipeR * 0.8,
-        6,
-        false,
-      )
-    })
-  }, [input.purlins, input.length, geo.span, geo.rise, geo.hoopStartY, pipeR])
+    const radius = input.purlinMaterial === 'wire' ? 0.004 : pipeR * 0.8
+    return geo.purlinPoints.map(
+      (p) =>
+        new TubeGeometry(
+          new CatmullRomCurve3([
+            new Vector3(p.x, p.y, -input.length / 2),
+            new Vector3(p.x, p.y, input.length / 2),
+          ]),
+          2,
+          radius,
+          6,
+          false,
+        ),
+    )
+  }, [geo.purlinPoints, input.length, input.purlinMaterial, pipeR])
 
   return (
     <group>
@@ -310,10 +360,10 @@ function CageModel({
       ))}
 
       {geo.hoopZs.map((z, i) => {
-        const sleeveTop = geo.hoopStartY
-        const sleeveBot = Math.max(0, sleeveTop - geo.pipeInsertM)
-        const postTop = Math.max(input.meshHeight, sleeveTop)
-        const postBot = -0.35
+        const sleeveTop = geo.sleeveTop
+        const sleeveBot = geo.sleeveBot
+        const postTop = geo.stickUp
+        const postBot = -geo.embedDepth
         const stubR = Math.min(pipeR * 0.62, 0.018)
         const timber = input.postType === 'pine90'
         return (
@@ -346,8 +396,28 @@ function CageModel({
       </mesh>
       {purlinGeoms.map((g, i) => (
         <mesh key={`purlin-${i}`} geometry={g}>
-          <meshStandardMaterial color={hoopMat.colour} />
+          <meshStandardMaterial
+            color={input.purlinMaterial === 'wire' ? '#c5cdd2' : hoopMat.colour}
+            metalness={input.purlinMaterial === 'wire' ? 0.6 : 0.05}
+          />
         </mesh>
+      ))}
+
+      {input.sleeperBase ? <Sleeper input={input} /> : null}
+
+      {geo.extraPosts.map((post, i) => (
+        <group key={`x-${i}`} position={[post.x, 0, post.z]}>
+          <mesh position={[0, (geo.stickUp - geo.embedDepth) / 2, 0]}>
+            <cylinderGeometry args={[0.012, 0.012, geo.stickUp + geo.embedDepth, 6]} />
+            <meshStandardMaterial color="#8a9298" metalness={0.35} roughness={0.4} />
+          </mesh>
+          {post.capped ? (
+            <mesh position={[0, geo.stickUp + 0.02, 0]}>
+              <sphereGeometry args={[0.03, 10, 10]} />
+              <meshStandardMaterial color="#f2e2a0" />
+            </mesh>
+          ) : null}
+        </group>
       ))}
 
       {showNet ? (
@@ -463,7 +533,7 @@ export function CageScene({
         view={view}
         length={input.length}
         width={input.width}
-        peak={input.peakHeight}
+        peak={geo.peakY}
         controlsRef={controlsRef}
       />
     </Canvas>

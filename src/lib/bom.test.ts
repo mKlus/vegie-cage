@@ -1,22 +1,45 @@
 import { describe, expect, it } from 'vitest'
 import { makeBed, OWNED_BIRDIE } from './birdies'
 import { buildBom } from './bom'
-import { DEFAULTS } from './model'
+import { buildGeometry } from './geometry'
+import { DEFAULTS, PRESETS, sanitise } from './model'
 import { BIRDIES_SHIP_AUD, birdiesBedAud, SOIL_M3_AUD } from './prices'
 
 describe('buildBom', () => {
-  it('counts 13 hoops of pipe for the 12 × 6 default', () => {
-    const bom = buildBom(DEFAULTS)
+  it('counts 13 hoops of pipe for the 12 × 6 preset', () => {
+    const preset = PRESETS.find((p) => p.id === '12x6')
+    const bom = buildBom(sanitise(preset!.patch))
     expect(bom.geo.hoopCount).toBe(13)
     const hoop = bom.lines.find((l) => l.id === 'hoop-pipe')
     expect(hoop?.exactM).toBeGreaterThan(13 * 6)
     expect(hoop?.buy).toMatch(/coil/)
   })
 
+  it('bills the Marek 5×10 picket build', () => {
+    const bom = buildBom(DEFAULTS)
+    expect(bom.geo.hoopCount).toBe(11)
+    expect(bom.lines.find((l) => l.id === 'posts')?.qty).toBe(34)
+    expect(bom.lines.find((l) => l.id === 'caps')?.exact).toMatch(/12 caps/)
+    expect(bom.lines.find((l) => l.id === 'sleeper')?.qty).toBe(13)
+    expect(bom.lines.find((l) => l.id === 'skirt')?.item).toMatch(/Buried/)
+    expect(bom.lines.find((l) => l.id === 'purlins')?.spec).toMatch(/2\.5 mm/)
+    expect(bom.lines.find((l) => l.id === 'hog-rings')?.spec).toMatch(/19 mm/)
+    expect(bom.lines.find((l) => l.id === 'anchors')?.qty).toBe(4)
+    expect(bom.lines.find((l) => l.id === 'guys')?.exact).toMatch(/4 ×/)
+    expect(bom.lines.find((l) => l.id === 'net-roof')?.buy).toBe('3 × 4 × 10 m')
+    const text = JSON.stringify(bom.lines)
+    expect(text).not.toMatch(/400 mm/)
+    expect(text).not.toMatch(/6 m width/)
+    expect(text).not.toMatch(/drive 400/)
+    expect(bom.totals.hoopPipeM).toBeGreaterThan(50)
+    expect(bom.totals.netM2).toBeGreaterThan(40)
+    expect(bom.totals.netM2).toBeLessThan(buildGeometry(DEFAULTS).span * DEFAULTS.length * 3)
+  })
+
   it('wall mesh run is perimeter minus door plus joins', () => {
     const bom = buildBom(DEFAULTS)
     const wall = bom.lines.find((l) => l.id === 'wall-mesh')
-    expect(wall?.exactM).toBeGreaterThan(2 * (12 + 6) - 1)
+    expect(wall?.exactM).toBeGreaterThan(2 * (DEFAULTS.length + DEFAULTS.width) - DEFAULTS.doorWidth)
     expect(wall?.buy).toMatch(/roll/)
   })
 

@@ -6,11 +6,11 @@ import { Diagrams } from './components/Diagrams'
 import { PlanEditor } from './components/PlanEditor'
 import { ThemeSwitch } from './components/ThemeSwitch'
 import { OWNED_BIRDIE, makeBed, packOwnedFour, snap } from './lib/birdies'
+import { computeCage } from './lib/compute'
 import { fillCage, fillLeftover, ownedMatching } from './lib/layout'
-import { buildBom } from './lib/bom'
-import { buildGeometry } from './lib/geometry'
 import { DEFAULTS, formatM, inputAisles, sanitise, type CageInputs } from './lib/model'
 import { loadInputs, saveInputs } from './lib/persist'
+import { readShare, writeShare } from './lib/share'
 import { useThemePref } from './lib/theme'
 
 const VIEWS: { id: ViewId; label: string }[] = [
@@ -40,16 +40,19 @@ export default function App() {
   const [draft, setDraft] = useState<BedDraft>({ ...OWNED_BIRDIE, owned: false, rot: 0 })
 
   useEffect(() => {
-    setInput(loadInputs())
+    setInput(readShare(window.location.search) ?? loadInputs())
     setReady(true)
   }, [])
 
   useEffect(() => {
-    if (ready) saveInputs(input)
+    if (!ready) return
+    saveInputs(input)
+    writeShare(input)
   }, [input, ready])
 
-  const geo = useMemo(() => buildGeometry(input), [input])
-  const bom = useMemo(() => buildBom(input), [input])
+  const result = useMemo(() => computeCage(input), [input])
+  const geo = result.geometry
+  const bom = result.bom
 
   function patch(p: Partial<CageInputs>) {
     setInput((prev) => sanitise({ ...prev, ...p }))
@@ -139,8 +142,8 @@ export default function App() {
           </div>
         </div>
         <p className="lede">
-          Mesh fence, poly U-hoops, taut net. Place Birdies beds on the Plan, then read the metre cut
-          list.
+          Star pickets, chicken wire, poly hoops, taut net. Marek 5×10 is the default. Place Birdies
+          beds on the Plan, then read the cut list. The address bar is the share link.
         </p>
         <div className="mast-tools">
           <ThemeSwitch value={themePref} onChange={setThemePref} />
@@ -169,7 +172,16 @@ export default function App() {
         <aside className="console">
           <div className="console-tools">
             <button type="button" onClick={() => patch(DEFAULTS)}>
-              Reset 12 × 6
+              Reset Marek 5×10
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                writeShare(input)
+                void navigator.clipboard.writeText(window.location.href)
+              }}
+            >
+              Copy link
             </button>
           </div>
           <Controls

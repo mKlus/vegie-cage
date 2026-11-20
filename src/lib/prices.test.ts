@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { birdiesBedAud, formatAud, meshRollAud, roundMoney } from './prices'
+import { birdiesBedAud, formatAud, meshRollAud, PRICE_TABLE, price, roundMoney } from './prices'
 
 describe('prices', () => {
   it('interpolates 122 × 244 × 37 from the 61 cm Pale Eucalypt base', () => {
@@ -11,6 +11,18 @@ describe('prices', () => {
   it('prices mesh by area and aperture', () => {
     expect(meshRollAud(25, 1.2, 30)).toBeCloseTo(1.2 * 30 * 8.5, 2)
     expect(meshRollAud(12, 0.9, 10)).toBeGreaterThan(meshRollAud(25, 0.9, 10))
+  })
+
+  it('keeps a source and a date on every price', () => {
+    expect(PRICE_TABLE.length).toBeGreaterThan(10)
+    for (const row of PRICE_TABLE) {
+      expect(row.source.length).toBeGreaterThan(4)
+      expect(row.date).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+      expect(row.aud).toBeGreaterThan(0)
+    }
+    expect(price('poly32')).toMatchObject({ aud: 127, verified: true })
+    expect(price('poly50').verified).toBe(false)
+    expect(price('star-1.8').verified).toBe(true)
   })
 
   it('formats AUD', () => {

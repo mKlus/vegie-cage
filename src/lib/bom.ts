@@ -1,5 +1,5 @@
 import { bedLabel, bedSku, growingM2, soilM3 } from './birdies'
-import { buildGeometry, type CageGeometry } from './geometry'
+import { buildGeometry, warnings, type CageGeometry } from './geometry'
 import {
   HOOP_MATERIAL,
   POST_TYPE,
@@ -9,23 +9,13 @@ import {
   round2,
 } from './model'
 import {
-  BIRDIES_SHIP_AUD,
-  CLIP_50_AUD,
-  DOOR_IRON_AUD,
-  HOOP_COIL_AUD,
-  NET_M2_AUD,
-  PEG_BAG_AUD,
-  PINE_70x35_2_4_AUD,
-  PINE_70x35_5_4_AUD,
-  POST_EACH_AUD,
   PRICE_NOTE,
-  SADDLE_AUD,
-  SOIL_M3_AUD,
-  STAPLES_KIT_AUD,
-  TIES_100_AUD,
   birdiesBedAud,
   formatAud,
+  hoopPrice,
   meshRollAud,
+  postPrice,
+  price,
   roundMoney,
 } from './prices'
 
@@ -87,8 +77,15 @@ function pickHeight(needed: number, stocks: number[]): number {
 }
 
 function pickRoll(lengthM: number, stocks: number[]): { count: number; size: number } {
-  const preferred = stocks.includes(30) && lengthM > 12 ? 30 : (stocks.includes(10) ? 10 : stocks[0]!)
-  return { count: ceilTo(lengthM, preferred), size: preferred }
+  let best = { count: Infinity, size: stocks[0]!, bought: Infinity }
+  for (const size of stocks) {
+    const count = ceilTo(lengthM, size)
+    const bought = count * size
+    if (bought < best.bought - 1e-9 || (Math.abs(bought - best.bought) < 1e-9 && count < best.count)) {
+      best = { count, size, bought }
+    }
+  }
+  return { count: best.count, size: best.size }
 }
 
 function coilOrSticks(exactM: number, stockM: number, kind: 'coil' | 'stick', extraJoiners = 0): string {
@@ -98,19 +95,22 @@ function coilOrSticks(exactM: number, stockM: number, kind: 'coil' | 'stick', ex
   return `${n} × ${stockM} m stick${n === 1 ? '' : 's'}${joiner}`
 }
 
+const SLEEPER_STOCK_M = 2.4
+const STAPLES_PER_KG = 400
+
 export function buildBom(input: CageInputs): BomResult {
   const geo = buildGeometry(input)
   const hoop = HOOP_MATERIAL[input.hoopMaterial]
   const mesh = WALL_MESH[input.wallMesh]
   const post = POST_TYPE[input.postType]
-  const hoopPrice = HOOP_COIL_AUD[input.hoopMaterial]
+  const hoopQuote = hoopPrice(input.hoopMaterial)
   const lines: BomLine[] = []
   const bedLines: BomLine[] = []
 
   const hoopPipeM = geo.hoopCount * geo.pipeEachM
   const ridgeM = input.length
-  const purlinM = input.purlins === 3 ? 2 * input.length : 0
-  const hoopTotalM = hoopPipeM + ridgeM + purlinM
+  const purlinPipeM = input.purlins === 3 && input.purlinMaterial === 'pipe' ? 2 * input.length : 0
+  const hoopTotalM = hoopPipeM + ridgeM + purlinPipeM
 
   let hoopJoiners = 0
   if (hoop.stockKind === 'stick' && geo.pipeEachM > hoop.stockM) {
@@ -128,7 +128,7 @@ export function buildBom(input: CageInputs): BomResult {
         exact: `${geo.hoopCount} hoops × ${geo.pipeEachM.toFixed(2)} m = ${round1(hoopPipeM).toFixed(1)} m`,
         exactM: round2(hoopPipeM),
         buy: coilOrSticks(hoopPipeM, hoop.stockM, hoop.stockKind, hoopJoiners),
-        note: `${(geo.pipeInsertM * 1000).toFixed(0)} mm sleeve on each post (pipe slides onto the post).`,
+        note: `${(geo.pipeInsertM * 1000).toFixed(0)} mm sleeve on the picket top (${geo.sleeveBot.toFixed(2)}–${geo.sleeveTop.toFixed(2)} m). Pipe stays vertical in the sleeve, then bends. Tightest radius ${geo.minBendRadius.toFixed(2)} m at the ${geo.bendAt}.`,
       },
       0,
       0,
@@ -154,7 +154,7 @@ export function buildBom(input: CageInputs): BomResult {
     ),
   )
 
-  if (purlinM > 0) {
+  if (purlinPipeM > 0) {
     lines.push(
       moneyLine(
         {
@@ -162,10 +162,10 @@ export function buildBom(input: CageInputs): BomResult {
           category: 'Frame',
           item: 'Side purlins (2)',
           spec: hoop.label,
-          exact: `2 × ${input.length.toFixed(2)} m = ${purlinM.toFixed(2)} m`,
-          exactM: round2(purlinM),
-          buy: coilOrSticks(purlinM, hoop.stockM, hoop.stockKind),
-          note: 'Halfway down each shoulder. Required at 6 m width in wind.',
+          exact: `2 × ${input.length.toFixed(2)} m = ${purlinPipeM.toFixed(2)} m`,
+          exactM: round2(purlinPipeM),
+          buy: coilOrSticks(purlinPipeM, hoop.stockM, hoop.stockKind),
+          note: 'Pipe purlins halfway down each shoulder. On a wide span, wire purlins do the same job lighter.',
         },
         0,
         0,
@@ -184,41 +184,56 @@ export function buildBom(input: CageInputs): BomResult {
         exact: `${round1(hoopTotalM).toFixed(1)} m`,
         exactM: round2(hoopTotalM),
         buy: coilOrSticks(hoopTotalM, hoop.stockM, hoop.stockKind, hoopJoiners),
-        note: 'Buy as one lot. Cut hoops first, leftover becomes ridge offcuts if you are on coils.',
+        note: `${hoopQuote.source}. ${hoopQuote.verified ? 'Verified' : 'Unverified'} ${hoopQuote.date}. Cut hoops first.`,
       },
       pipeBuyN,
-      hoopPrice.unitAud,
+      hoopQuote.aud,
     ),
   )
 
-  const longPosts = geo.hoopCount * 2
-  const endPosts = Math.max(3, Math.round(input.width / 1.2) + 1) * 2
-  const doorJambs = 2
-  const postCount = longPosts + endPosts + doorJambs
-  const postLen = Math.max(post.stockM, input.meshHeight + 0.45)
-
+  const postCount = geo.pickets.total
+  const postQuote = postPrice(input.postType, input.picketLength)
   lines.push(
     moneyLine(
       {
         id: 'posts',
         category: 'Fence',
         item: 'Posts',
-        spec: post.label,
-        exact: `${postCount} posts, ${postLen.toFixed(2)} m each (${round1(postCount * postLen).toFixed(1)} m)`,
-        exactM: round2(postCount * postLen),
-        buy: `${postCount} × ${post.stockM} m`,
-        note:
-          input.postType === 'star'
-            ? 'One picket per hoop on each long side, extras on the ends and door. Drive 400 mm into soil.'
-            : 'Corners, every ~2.4 m, plus two door jambs. Concrete or ram 400 mm.',
+        spec: `${post.label}, ${input.picketLength.toFixed(2)} m`,
+        exact: `${postCount} posts × ${input.picketLength.toFixed(2)} m (${round1(postCount * input.picketLength).toFixed(1)} m)`,
+        exactM: round2(postCount * input.picketLength),
+        buy: `${postCount} × ${input.picketLength.toFixed(2)} m`,
+        note: `Embed ${(input.embedDepth * 1000).toFixed(0)} mm, stick-up ${geo.stickUp.toFixed(2)} m. ${geo.pickets.hoop} under hoops (no caps), ${geo.pickets.end} end-wall including ${geo.pickets.jambs} door jambs, ${geo.pickets.stays} corner stays. ${postQuote.source}.`,
       },
       postCount,
-      POST_EACH_AUD[input.postType],
+      postQuote.aud,
     ),
   )
 
+  if (geo.pickets.caps > 0) {
+    const cap = price('cap-10')
+    const packs = ceilTo(geo.pickets.caps, 10)
+    lines.push(
+      moneyLine(
+        {
+          id: 'caps',
+          category: 'Fence',
+          item: 'Picket caps',
+          spec: cap.label,
+          exact: `${geo.pickets.caps} caps`,
+          exactM: geo.pickets.caps,
+          buy: `${packs} × pack of 10`,
+          note: 'Only pickets the hoop does not cover: end wall, door jambs, corner stays. Hoop pickets are sleeved.',
+        },
+        packs,
+        cap.aud,
+      ),
+    )
+  }
+
   const railM = 2 * input.length + 2 * input.width
   if (input.postType !== 'star') {
+    const railQuote = price('pine-70x35-5.4')
     const railSticks = ceilTo(railM, 5.4)
     lines.push(
       moneyLine(
@@ -230,34 +245,56 @@ export function buildBom(input: CageInputs): BomResult {
           exact: `${railM.toFixed(2)} m (full perimeter)`,
           exactM: round2(railM),
           buy: `${railSticks} × 5.4 m of 70 × 35`,
-          note: 'Staple mesh to this. Saddle-clip hoops to it if they start at the rail.',
+          note: 'Staple mesh to this. Saddle-clip hoops to it when the pipe starts at a rail.',
         },
         railSticks,
-        PINE_70x35_5_4_AUD,
+        railQuote.aud,
       ),
     )
+    if (!input.sleeperBase) {
+      lines.push(
+        moneyLine(
+          {
+            id: 'bottom-rail',
+            category: 'Fence',
+            item: 'Bottom rail',
+            spec: '70 × 35 H3 pine',
+            exact: `${railM.toFixed(2)} m`,
+            exactM: round2(railM),
+            buy: `${railSticks} × 5.4 m of 70 × 35`,
+            note: 'Keeps mesh tight at the soil line when there is no sleeper.',
+          },
+          railSticks,
+          railQuote.aud,
+        ),
+      )
+    }
+  }
+
+  const sleeperRun = input.sleeperBase ? Math.max(0, geo.perimeterM - input.doorWidth) : 0
+  if (sleeperRun > 0) {
+    const sleeper = price('sleeper-200x50-2.4')
+    const sticks = ceilTo(sleeperRun, SLEEPER_STOCK_M)
     lines.push(
       moneyLine(
         {
-          id: 'bottom-rail',
+          id: 'sleeper',
           category: 'Fence',
-          item: 'Bottom rail',
-          spec: '70 × 35 H3 pine',
-          exact: `${railM.toFixed(2)} m`,
-          exactM: round2(railM),
-          buy: `${railSticks} × 5.4 m of 70 × 35`,
-          note: 'Keeps mesh tight at soil line. Skip only if you bury the mesh into a trench.',
+          item: 'Base sleeper',
+          spec: sleeper.label,
+          exact: `${sleeperRun.toFixed(2)} m outside the pickets, door gap left open`,
+          exactM: round2(sleeperRun),
+          buy: `${sticks} × ${SLEEPER_STOCK_M} m`,
+          note: '200 × 50 on edge: about 100 mm in the ground, 100 mm above. Fix to the pickets. Staple the wire to the face.',
         },
-        railSticks,
-        PINE_70x35_5_4_AUD,
+        sticks,
+        sleeper.aud,
       ),
     )
   }
 
-  const meshHeightStock = pickHeight(input.meshHeight + input.bury, mesh.stockHeights)
-  const meshRun = geo.meshRunM + 0.3 * 4
-  const apronM = input.apron > 0 ? geo.perimeterM : 0
-  const wallMeshM = meshRun
+  const meshHeightStock = pickHeight(input.meshHeight, mesh.stockHeights)
+  const wallMeshM = geo.meshRunM
   const wallRoll = pickRoll(wallMeshM, mesh.stockLengths)
 
   lines.push(
@@ -270,68 +307,63 @@ export function buildBom(input: CageInputs): BomResult {
         exact: `${wallMeshM.toFixed(2)} m run × ${input.meshHeight.toFixed(2)} m high (${(wallMeshM * input.meshHeight).toFixed(1)} m²)`,
         exactM: round2(wallMeshM),
         buy: `${wallRoll.count} × ${meshHeightStock.toFixed(1)} m × ${wallRoll.size} m roll${wallRoll.count === 1 ? '' : 's'}`,
-        note: `Perimeter ${geo.perimeterM.toFixed(2)} m minus ${input.doorWidth.toFixed(2)} m door, plus joins. ${input.bury > 0 ? `Includes ${input.bury.toFixed(2)} m to drop into a trench.` : 'No bury — rely on the apron.'}`,
+        note: `Wire height is independent of the sleeve. Perimeter ${geo.perimeterM.toFixed(2)} m minus the ${input.doorWidth.toFixed(2)} m door, plus joins.`,
       },
       wallRoll.count,
       meshRollAud(mesh.apertureMm, meshHeightStock, wallRoll.size),
     ),
   )
 
-  if (apronM > 0) {
-    const apronRoll = pickRoll(apronM, mesh.stockLengths)
-    const apronH = pickHeight(Math.max(0.3, input.apron), [0.3, 0.6, 0.9])
+  let skirtM = 0
+  if (input.skirtMode !== 'none' && input.skirtDepth > 0) {
+    const skirtH = pickHeight(Math.max(input.skirtDepth, 0.3), mesh.stockHeights)
+    const strips = Math.max(1, Math.floor((skirtH + 1e-9) / input.skirtDepth))
+    const coverPerMetreOfRoll = strips
+    const skirtRun = input.skirtMode === 'l-outward' ? Math.max(0, geo.perimeterM - input.doorWidth) : geo.perimeterM
+    skirtM = skirtRun
+    const rollNeed = skirtRun / coverPerMetreOfRoll
+    const skirtRoll = pickRoll(rollNeed, mesh.stockLengths)
+    const folded = input.skirtMode === 'l-outward'
     lines.push(
       moneyLine(
         {
-          id: 'apron',
+          id: 'skirt',
           category: 'Fence',
-          item: 'Dig apron',
-          spec: `${mesh.label} (or 12.5 mm if rats appear later)`,
-          exact: `${apronM.toFixed(2)} m run × ${input.apron.toFixed(2)} m wide = ${(apronM * input.apron).toFixed(1)} m²`,
-          exactM: round2(apronM),
-          buy: `${apronRoll.count} × ${apronH.toFixed(1)} m × ${apronRoll.size} m, folded out`,
-          note: 'L-shape on the outside, peg every 0.4 m, cover with mulch. Stops rabbits and dogs digging at the line.',
+          item: folded ? 'L-folded apron' : 'Buried skirt',
+          spec: `${mesh.label}, ripped from a ${skirtH.toFixed(1)} m roll (${strips} strips)`,
+          exact: `${skirtRun.toFixed(2)} m × ${input.skirtDepth.toFixed(2)} m = ${(skirtRun * input.skirtDepth).toFixed(1)} m²`,
+          exactM: round2(skirtRun),
+          buy: `${skirtRoll.count} × ${skirtH.toFixed(1)} m × ${skirtRoll.size} m roll${skirtRoll.count === 1 ? '' : 's'}`,
+          note: folded
+            ? 'Separate from the wall wire. Fold outward on the soil, peg, cover with mulch.'
+            : 'Separate from the wall wire. Bury vertical in a trench, 200–300 mm deep.',
         },
-        apronRoll.count,
-        meshRollAud(mesh.apertureMm, apronH, apronRoll.size),
+        skirtRoll.count,
+        meshRollAud(mesh.apertureMm, skirtH, skirtRoll.size),
       ),
     )
   }
 
-  const netClip = 0.3
-  const roofNetW = geo.netArcM + 2 * netClip
-  const roofNetL = input.length + 1.0
-  const roofM2 = roofNetW * roofNetL
-  const endNetW = input.width + 0.4
-  const endNetH = input.peakHeight + 0.3
-  const endM2 = 2 * endNetW * endNetH
-  const doorCredit = input.doorWidth * input.doorHeight
-  const netM2 = roofM2 + endM2
-
-  const netWide = roofNetW <= 5.2 ? 5 : roofNetW <= 6.2 ? 6 : 10
-  const roofBuyL = roofNetL
-  const endPieces = 2
-
+  const net = geo.net
+  const netRate = price('net-m2')
+  const pieceAud = roundMoney(net.stockW * net.stockL * netRate.aud)
   lines.push(
     moneyLine(
       {
         id: 'net-roof',
         category: 'Cover',
-        item: 'Roof net',
+        item: 'Roof and end net',
         spec:
           input.netType === 'wildlife5'
             ? 'Knitted white wildlife-safe net, ≤ 5 mm mesh'
             : 'Knitted anti-bird net, 5 mm',
-        exact: `${roofNetW.toFixed(2)} m developed width × ${roofNetL.toFixed(2)} m long = ${roofM2.toFixed(1)} m²`,
-        exactM: round2(roofNetW),
-        buy:
-          netWide >= 10 && roofNetW > 6.2
-            ? `1 × 10 m wide × ${Math.ceil(roofBuyL)} m, or two 5 m strips seamed on the ridge`
-            : `1 × ${netWide} m wide × ${Math.ceil(roofBuyL)} m`,
-        note: 'Taut. Loose net traps bats and possums — illegal in VIC at > 5 mm, stupid everywhere. Clip to every hoop and to the top of the wall mesh.',
+        exact: `Roof ${net.roofWidthM.toFixed(2)} × ${net.roofLengthM.toFixed(2)} m (${net.roofAreaM2.toFixed(1)} m²) + ends ${net.endAreaM2.toFixed(1)} m² arch = ${net.usedM2.toFixed(1)} m²`,
+        exactM: round2(net.roofWidthM),
+        buy: net.buy,
+        note: 'Cut to stock pieces. Roof runs down to overlap the top of the wire. End walls follow the arch, not a rectangle. Taut net: loose net traps bats and possums.',
       },
-      round2(roofM2 + endM2),
-      NET_M2_AUD,
+      net.pieces,
+      pieceAud,
     ),
   )
 
@@ -341,11 +373,11 @@ export function buildBom(input: CageInputs): BomResult {
         id: 'net-ends',
         category: 'Cover',
         item: 'End-wall net',
-        spec: 'Same net as roof',
-        exact: `2 × ${endNetW.toFixed(2)} m × ${endNetH.toFixed(2)} m = ${endM2.toFixed(1)} m²`,
-        exactM: round2(endM2),
-        buy: `${endPieces} panels, cut from leftover or +${Math.ceil(endNetH * 2)} m of the same roll`,
-        note: `Cut around the door opening (credit ${doorCredit.toFixed(2)} m²). Sew or clip to the end hoop and the wall mesh so possums cannot squeeze the eave.`,
+        spec: 'Same net, arch shape',
+        exact: `${net.endAreaM2.toFixed(1)} m² both ends, door cut out of the near end`,
+        exactM: round2(net.endAreaM2),
+        buy: 'Cut from the stock pieces above',
+        note: 'Area under the real hoop above the wire, including the short drop that overlaps the mesh. Not width × peak.',
       },
       0,
       0,
@@ -356,21 +388,22 @@ export function buildBom(input: CageInputs): BomResult {
   const doorH = input.doorHeight
   const doorW = input.doorWidth
   const doorStick = 2 * doorH + 3 * doorW
+  const doorQuote = price('pine-70x35-2.4')
   const doorSticks = ceilTo(doorStick + 2 * doorH, 2.4)
   lines.push(
     moneyLine(
       {
         id: 'door-frame',
         category: 'Door',
-        item: 'Door frame + jambs',
+        item: 'Door frame + leaf',
         spec: '70 × 35 H3 pine',
-        exact: `Leaf ${doorStick.toFixed(2)} m (2 stiles, 3 rails) + 2 jambs × ${Math.max(doorH, input.meshHeight).toFixed(2)} m`,
+        exact: `Leaf ${doorStick.toFixed(2)} m (2 stiles, 3 rails) + 2 jamb linings × ${Math.max(doorH, input.meshHeight).toFixed(2)} m`,
         exactM: round2(doorStick + 2 * Math.max(doorH, input.meshHeight)),
         buy: `${doorSticks} × 2.4 m of 70 × 35`,
-        note: 'Diagonal brace on the leaf. Three hinges. Drop bolt into a pipe socket. Latch a dog cannot nose.',
+        note: 'Diagonal brace on the leaf. Three hinges. Drop bolt into a pipe socket. Latch a dog cannot nose. Picket door jambs are in the post count.',
       },
       doorSticks,
-      PINE_70x35_2_4_AUD,
+      doorQuote.aud,
     ),
   )
 
@@ -390,6 +423,109 @@ export function buildBom(input: CageInputs): BomResult {
       0,
       0,
       false,
+    ),
+  )
+
+  const lineCount = input.sleeperBase ? 2 : 3
+  const lineM = lineCount * geo.meshRunM * 1.05
+  const purlinWireM = input.purlins === 3 && input.purlinMaterial === 'wire' ? 2 * (input.length + 2) : 0
+  const guyCount = 4
+  const guyEach = 4
+  const guyM = guyCount * guyEach
+  const wireM = lineM + purlinWireM + guyM
+  const wireBuy = cheapestWire(wireM)
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'line-wire',
+        category: 'Frame',
+        item: 'Line wires',
+        spec: '2.5 mm high-tensile fencing wire',
+        exact: `${lineCount} runs × ${geo.meshRunM.toFixed(2)} m ≈ ${lineM.toFixed(1)} m`,
+        exactM: round2(lineM),
+        buy: 'Included in the 2.5 mm coil',
+        note: input.sleeperBase
+          ? 'Mid and top of the wire. The bottom is stapled to the sleeper, so no bottom line wire.'
+          : 'Bottom, mid, and top. Hog-ring the mesh to each line.',
+      },
+      0,
+      0,
+      false,
+    ),
+  )
+
+  if (purlinWireM > 0) {
+    lines.push(
+      moneyLine(
+        {
+          id: 'purlins',
+          category: 'Frame',
+          item: 'Wire purlins (2)',
+          spec: '2.5 mm high-tensile, tensioned',
+          exact: `2 × ${(input.length + 2).toFixed(2)} m = ${purlinWireM.toFixed(1)} m`,
+          exactM: round2(purlinWireM),
+          buy: 'Included in the 2.5 mm coil',
+          note: 'Halfway down each shoulder, strained between the end hoops. Stops the net sailing between hoops.',
+        },
+        0,
+        0,
+        false,
+      ),
+    )
+  }
+
+  lines.push(
+    moneyLine(
+      {
+        id: 'guys',
+        category: 'Frame',
+        item: 'End guys',
+        spec: '2.5 mm wire, diagonal, both end hoops',
+        exact: `${guyCount} × ${guyEach} m = ${guyM} m`,
+        exactM: guyM,
+        buy: 'Included in the 2.5 mm coil',
+        note: 'One pair on each end hoop, down to a ground anchor. These are the diagonal braces.',
+      },
+      0,
+      0,
+      false,
+    ),
+  )
+
+  const wireQuote = price(wireBuy.id)
+  lines.push(
+    moneyLine(
+      {
+        id: 'wire-coil',
+        category: 'Frame',
+        item: '2.5 mm fencing wire',
+        spec: wireQuote.label,
+        exact: `${wireM.toFixed(1)} m (lines + purlins + guys)`,
+        exactM: round2(wireM),
+        buy: `${wireBuy.count} × ${wireBuy.stock} m coil${wireBuy.count === 1 ? '' : 's'}`,
+        note: wireQuote.source,
+      },
+      wireBuy.count,
+      wireQuote.aud,
+    ),
+  )
+
+  const anchor = price('anchor')
+  lines.push(
+    moneyLine(
+      {
+        id: 'anchors',
+        category: 'Frame',
+        item: 'Ground anchors',
+        spec: anchor.label,
+        exact: `${guyCount} anchors`,
+        exactM: guyCount,
+        buy: `${guyCount} anchors`,
+        note: 'One per guy, outside the end hoops.',
+      },
+      guyCount,
+      anchor.aud,
     ),
   )
 
@@ -459,6 +595,7 @@ export function buildBom(input: CageInputs): BomResult {
 
   const soilTotal = input.beds.reduce((s, b) => s + soilM3(b), 0)
   const growTotal = input.beds.reduce((s, b) => s + growingM2(b), 0)
+  const soilQuote = price('soil-m3')
   bedLines.push(
     moneyLine(
       {
@@ -472,11 +609,12 @@ export function buildBom(input: CageInputs): BomResult {
         note: 'Birdies walls are thin steel — volume is the outside L × W × H. Priced as bulk mix.',
       },
       round2(soilTotal),
-      SOIL_M3_AUD,
+      soilQuote.aud,
     ),
   )
   const bedsToBuy = input.beds.filter((b) => !b.owned).length
   if (bedsToBuy > 0) {
+    const ship = price('birdies-ship')
     bedLines.push(
       moneyLine(
         {
@@ -490,13 +628,14 @@ export function buildBom(input: CageInputs): BomResult {
           note: 'Edging excluded. Remote depot extra.',
         },
         1,
-        BIRDIES_SHIP_AUD,
+        ship.aud,
       ),
     )
   }
 
   const zipTies = geo.hoopCount * (input.purlins + 8)
   const tieBags = Math.ceil(zipTies / 100)
+  const ties = price('ties-100')
   lines.push(
     moneyLine(
       {
@@ -510,11 +649,12 @@ export function buildBom(input: CageInputs): BomResult {
         note: 'Hoop-to-ridge, hoop-to-purlin, net-to-hoop. Snip tails so they do not punch the net.',
       },
       tieBags,
-      TIES_100_AUD,
+      ties.aud,
     ),
   )
 
   if (input.postType !== 'star') {
+    const saddle = price('saddle')
     lines.push(
       moneyLine(
         {
@@ -528,46 +668,97 @@ export function buildBom(input: CageInputs): BomResult {
           note: 'Two per hoop, into the top rail.',
         },
         geo.hoopCount * 2,
-        SADDLE_AUD,
+        saddle.aud,
       ),
     )
   }
 
+  const stapleRun = input.sleeperBase ? sleeperRun : geo.meshRunM
+  const stapleCount = Math.ceil(stapleRun / 0.15)
+  const stapleKg = Math.max(1, Math.ceil(stapleCount / STAPLES_PER_KG))
+  const staples = price('staples-kg')
   lines.push(
     moneyLine(
       {
         id: 'staples',
         category: 'Fixings',
-        item: 'Fence staples / tie wire',
-        spec: 'Galvanised 20 mm staples, 1.6 mm tie wire',
-        exact: `~${Math.ceil(geo.meshRunM * 4)} staples; 30 m tie wire`,
-        exactM: geo.meshRunM * 4,
-        buy: '1 kg staples + 1 × 30 m tie wire',
-        note: 'Staple mesh every 150 mm on rails. Tie to star pickets every 200 mm.',
+        item: 'Fence staples',
+        spec: 'Galvanised 20–25 mm',
+        exact: `~${stapleCount} staples (every 150 mm)`,
+        exactM: stapleCount,
+        buy: `${stapleKg} kg`,
+        note: input.sleeperBase
+          ? 'Staple the wire to the sleeper face every 150 mm.'
+          : 'Staple mesh every 150 mm on the rails.',
       },
-      1,
-      STAPLES_KIT_AUD,
+      stapleKg,
+      staples.aud,
     ),
   )
 
-  const pegBags = ceilTo(geo.perimeterM / 0.4, 50)
+  const hogAlong = Math.ceil((lineCount * geo.meshRunM) / 0.2)
+  const hogNet = Math.ceil(geo.perimeterM / 0.15)
+  const hogCount = hogAlong + hogNet
+  const hog = price('hog-500')
+  const hogBoxes = ceilTo(hogCount, 500)
   lines.push(
     moneyLine(
       {
-        id: 'pegs',
+        id: 'hog-rings',
         category: 'Fixings',
-        item: 'Apron pegs + net clips',
-        spec: '150 mm landscape staples, poly hoop clips',
-        exact: `${Math.ceil(geo.perimeterM / 0.4)} pegs; ~${geo.hoopCount * 6} net clips`,
-        exactM: Math.ceil(geo.perimeterM / 0.4),
-        buy: `${pegBags} bags of 50 pegs + 50 hoop clips`,
-        note: 'Peg the apron. Clips hold net to pipe without punching holes.',
+        item: 'Hog rings',
+        spec: '19 mm (3/4 in) galvanised',
+        exact: `~${hogCount} rings (${hogAlong} mesh-to-line, ${hogNet} net-to-wire)`,
+        exactM: hogCount,
+        buy: `${hogBoxes} × box of 500, plus hog-ring pliers`,
+        note: 'Every 200 mm on the line wires, every 150 mm where the net overlaps the wire.',
       },
-      pegBags,
-      PEG_BAG_AUD + CLIP_50_AUD,
+      hogBoxes,
+      hog.aud,
     ),
   )
 
+  if (input.skirtMode === 'l-outward') {
+    const pegQuote = price('peg-50')
+    const pegBags = ceilTo(geo.perimeterM / 0.4, 50)
+    lines.push(
+      moneyLine(
+        {
+          id: 'pegs',
+          category: 'Fixings',
+          item: 'Apron pegs',
+          spec: '150 mm landscape staples',
+          exact: `${Math.ceil(geo.perimeterM / 0.4)} pegs`,
+          exactM: Math.ceil(geo.perimeterM / 0.4),
+          buy: `${pegBags} bags of 50`,
+          note: 'Peg the outward L every 0.4 m and cover it with mulch.',
+        },
+        pegBags,
+        pegQuote.aud,
+      ),
+    )
+  }
+
+  const clip = price('clip-50')
+  const clipBags = Math.max(1, Math.ceil((geo.hoopCount * 6) / 50))
+  lines.push(
+    moneyLine(
+      {
+        id: 'clips',
+        category: 'Fixings',
+        item: 'Net clips',
+        spec: clip.label,
+        exact: `~${geo.hoopCount * 6} clips`,
+        exactM: geo.hoopCount * 6,
+        buy: `${clipBags * 50} clips`,
+        note: 'Hold the net to the pipe without punching holes.',
+      },
+      clipBags,
+      clip.aud,
+    ),
+  )
+
+  const iron = price('door-iron')
   lines.push(
     moneyLine(
       {
@@ -581,12 +772,11 @@ export function buildBom(input: CageInputs): BomResult {
         note: 'Self-closing spring optional. Threshold strip so the leaf does not snag mulch.',
       },
       1,
-      DOOR_IRON_AUD,
+      iron.aud,
     ),
   )
 
-  const timberM = input.postType === 'pine90' ? postCount * postLen : 0
-  const timberDoor = doorStick
+  const timberPosts = input.postType === 'pine90' ? postCount * input.picketLength : 0
   const cageAud = roundMoney(lines.reduce((s, l) => s + (l.inTotal ? l.lineAud : 0), 0))
   const bedsAud = roundMoney(bedLines.reduce((s, l) => s + (l.inTotal ? l.lineAud : 0), 0))
 
@@ -596,9 +786,9 @@ export function buildBom(input: CageInputs): BomResult {
     geo,
     totals: {
       hoopPipeM: round1(hoopTotalM),
-      meshM: round1(wallMeshM + apronM),
-      netM2: round1(netM2),
-      timberM: round1(timberM + timberDoor),
+      meshM: round1(wallMeshM + skirtM),
+      netM2: round1(net.usedM2),
+      timberM: round1(timberPosts + sleeperRun + doorStick),
       soilM3: round1(soilTotal),
       growM2: round1(growTotal),
       cageAud,
@@ -608,35 +798,55 @@ export function buildBom(input: CageInputs): BomResult {
   }
 }
 
-function dumpLines(lines: BomLine[]): string[] {
-  const rows: string[] = []
+function cheapestWire(metres: number): { count: number; stock: number; id: string } {
+  const options = [
+    { stock: 100, id: 'wire-2.5-100' },
+    { stock: 500, id: 'wire-2.5-500' },
+  ]
+  let best = { count: Infinity, stock: 500, id: 'wire-2.5-500', bought: Infinity }
+  for (const opt of options) {
+    const count = ceilTo(metres, opt.stock)
+    const bought = count * opt.stock
+    if (bought < best.bought - 1e-9 || (Math.abs(bought - best.bought) < 1e-9 && count < best.count)) {
+      best = { count, stock: opt.stock, id: opt.id, bought }
+    }
+  }
+  return best
+}
+
+function dumpLines(rows: BomLine[]): string[] {
+  const out: string[] = []
   let cat = ''
-  for (const line of lines) {
+  for (const line of rows) {
     if (line.category !== cat) {
       cat = line.category
-      rows.push(`## ${cat}`)
+      out.push(`## ${cat}`)
     }
-    rows.push(`${line.item} — ${line.spec}`)
-    rows.push(`  exact: ${line.exact}`)
-    rows.push(`  buy:   ${line.buy}`)
-    if (line.inTotal) rows.push(`  est:   ${formatAud(line.lineAud)}`)
-    if (line.note) rows.push(`  note:  ${line.note}`)
-    rows.push('')
+    out.push(`${line.item} — ${line.spec}`)
+    out.push(`  exact: ${line.exact}`)
+    out.push(`  buy:   ${line.buy}`)
+    if (line.inTotal) out.push(`  est:   ${formatAud(line.lineAud)}`)
+    if (line.note) out.push(`  note:  ${line.note}`)
+    out.push('')
   }
-  return rows
+  return out
 }
 
 export function bomPlainText(input: CageInputs, bom: BomResult): string {
   const g = bom.geo
+  const notes = warnings(input, g).map((w) => `${w.level}: ${w.text}`)
   return [
     `Vegie cage cut list`,
-    `${input.length.toFixed(2)} m long × ${input.width.toFixed(2)} m wide × ${input.peakHeight.toFixed(2)} m peak`,
-    `Wall mesh ${input.meshHeight.toFixed(2)} m. ${g.hoopCount} hoops @ ${g.actualSpacing.toFixed(2)} m. Each hoop pipe ${g.pipeEachM.toFixed(2)} m.`,
+    `${input.length.toFixed(2)} m long × ${input.width.toFixed(2)} m wide × ${g.peakY.toFixed(2)} m peak`,
+    `Stick-up ${g.stickUp.toFixed(2)} m, embed ${(input.embedDepth * 1000).toFixed(0)} mm. Wire ${input.meshHeight.toFixed(2)} m. ${g.hoopCount} hoops @ ${g.actualSpacing.toFixed(2)} m. Each hoop ${g.pipeEachM.toFixed(2)} m. Tightest bend ${g.minBendRadius.toFixed(2)} m.`,
     ``,
     `## Cage (est. ${formatAud(bom.totals.cageAud)})`,
     ...dumpLines(bom.lines),
     `## Birdies beds (est. ${formatAud(bom.totals.bedsAud)})`,
     ...dumpLines(bom.bedLines),
+    `## Checks`,
+    ...notes,
+    ``,
     bom.priceNote,
   ].join('\n')
 }
