@@ -289,6 +289,11 @@ export function frameHeights(
 
 type LegacyInputs = Partial<CageInputs> & { apron?: number; bury?: number; aisle?: number; aisleWall?: number }
 
+/** Structural equality for persisted settings. Key order follows sanitise(). */
+export function sameInputs(a: CageInputs, b: CageInputs): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
 export function sanitise(raw: LegacyInputs): CageInputs {
   const src: LegacyInputs = { ...DEFAULTS, ...raw }
   const length = clamp(num(src.length, DEFAULTS.length), LIMITS.length.min, LIMITS.length.max)

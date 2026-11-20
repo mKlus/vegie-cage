@@ -12,7 +12,9 @@ export function loadInputs(): CageInputs {
 
 export function saveInputs(inputs: CageInputs): void {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(inputs))
+    const json = JSON.stringify(inputs)
+    if (localStorage.getItem(STORAGE_KEY) === json) return
+    localStorage.setItem(STORAGE_KEY, json)
   } catch {
     /* quota */
   }

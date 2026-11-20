@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BomPanel } from './components/BomPanel'
 import { CageScene, type ViewId } from './components/CageScene'
 import { Controls, type BedDraft } from './components/Controls'
@@ -8,9 +8,9 @@ import { ThemeSwitch } from './components/ThemeSwitch'
 import { OWNED_BIRDIE, makeBed, packOwnedFour, snap } from './lib/birdies'
 import { computeCage } from './lib/compute'
 import { fillCage, fillLeftover, ownedMatching } from './lib/layout'
-import { DEFAULTS, formatM, inputAisles, sanitise, type CageInputs } from './lib/model'
+import { DEFAULTS, formatM, inputAisles, sameInputs, sanitise, type CageInputs } from './lib/model'
 import { loadInputs, saveInputs } from './lib/persist'
-import { readShare, writeShare } from './lib/share'
+import { createDebouncedSync, readShare, writeShare } from './lib/share'
 import { useThemePref } from './lib/theme'
 
 const VIEWS: { id: ViewId; label: string }[] = [
@@ -38,28 +38,51 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placing, setPlacing] = useState(false)
   const [draft, setDraft] = useState<BedDraft>({ ...OWNED_BIRDIE, owned: false, rot: 0 })
+  const sync = useRef(
+    createDebouncedSync((next) => {
+      saveInputs(next)
+      writeShare(next)
+    }),
+  )
+  const serial = JSON.stringify(input)
 
   useEffect(() => {
-    setInput(readShare(window.location.search) ?? loadInputs())
+    const next = readShare(window.location.search) ?? loadInputs()
+    setInput((prev) => (sameInputs(prev, next) ? prev : next))
     setReady(true)
   }, [])
 
+  // Depend on the serialised settings, not the object. A new object with the
+  // same fields must not call replaceState again (Safari's 100/10s cap).
   useEffect(() => {
     if (!ready) return
-    saveInputs(input)
-    writeShare(input)
-  }, [input, ready])
+    const next = JSON.parse(serial) as CageInputs
+    const handle = sync.current
+    handle.schedule(next)
+    const onHide = () => handle.flush()
+    window.addEventListener('pagehide', onHide)
+    return () => {
+      window.removeEventListener('pagehide', onHide)
+      handle.cancel()
+    }
+  }, [ready, serial])
 
   const result = useMemo(() => computeCage(input), [input])
   const geo = result.geometry
   const bom = result.bom
 
   function patch(p: Partial<CageInputs>) {
-    setInput((prev) => sanitise({ ...prev, ...p }))
+    setInput((prev) => {
+      const next = sanitise({ ...prev, ...p })
+      return sameInputs(prev, next) ? prev : next
+    })
   }
 
   function mapBeds(fn: (prev: CageInputs) => CageInputs['beds']) {
-    setInput((prev) => sanitise({ ...prev, beds: fn(prev) }))
+    setInput((prev) => {
+      const next = sanitise({ ...prev, beds: fn(prev) })
+      return sameInputs(prev, next) ? prev : next
+    })
   }
 
   function startPlace() {
@@ -177,7 +200,8 @@ export default function App() {
             <button
               type="button"
               onClick={() => {
-                writeShare(input)
+                sync.current.schedule(input)
+                sync.current.flush()
                 void navigator.clipboard.writeText(window.location.href)
               }}
             >
