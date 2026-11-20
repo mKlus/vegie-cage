@@ -246,6 +246,53 @@ button.is-on {
 .d-swing { fill: none; stroke: var(--timber); stroke-width: 1.2; stroke-dasharray: 3 2; }
 .d-outline { fill: none; stroke: var(--ink); stroke-width: 1.4; }
 .d-bed { stroke: #1c2416; stroke-width: 1; }
+.d-guy { fill: none; stroke: #ff5c1a; stroke-width: 2.6; stroke-linecap: round; }
+.d-brace { fill: none; stroke: #ff2d3a; stroke-width: 3; stroke-linecap: round; }
+.d-anchor { fill: #ffd84a; stroke: #6b4e10; stroke-width: 1; }
+.d-door-mark { stroke: var(--timber); stroke-width: 6; stroke-linecap: round; }
+.d-dim { fill: var(--ink); font-size: 12px; font-family: var(--sans); }
+.d-panel { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
+
+.stay-sheet { display: grid; gap: 0.45rem; padding: 0.7rem 0.8rem 1.4rem; }
+.stay-sheet h3 { margin: 0.35rem 0 0; font-size: 0.95rem; font-family: var(--display); font-weight: 600; }
+.stay-sheet p { margin: 0; color: var(--muted); font-size: 0.82rem; line-height: 1.4; }
+.stay-legend, .bracing-legend {
+  list-style: none;
+  margin: 0;
+  padding: 0.45rem 0.6rem;
+  display: grid;
+  gap: 0.28rem;
+  font-size: 0.78rem;
+}
+.stay-legend { background: var(--lift); border-radius: 10px; }
+.stay-legend li, .bracing-legend li { display: flex; align-items: center; gap: 0.4rem; }
+.stay-legend i, .bracing-legend i {
+  width: 0.75rem;
+  height: 0.75rem;
+  border-radius: 2px;
+  display: block;
+  flex: none;
+}
+.bracing-legend {
+  position: absolute;
+  z-index: 2;
+  left: 0.7rem;
+  bottom: 0.7rem;
+  background: rgba(18, 24, 16, 0.9);
+  color: #eef3e2;
+  border: 1px solid rgba(255, 92, 26, 0.65);
+  border-radius: 10px;
+  pointer-events: none;
+}
+.wind-tag {
+  color: #ffd84a;
+  background: rgba(18, 24, 16, 0.88);
+  border: 1px solid #ff5c1a;
+  border-radius: 6px;
+  padding: 0.15rem 0.45rem;
+  font: 700 12px/1.2 "IBM Plex Sans", system-ui, sans-serif;
+  white-space: nowrap;
+}
 
 .check { display: flex; gap: 0.45rem; align-items: center; margin: 0.5rem 0; font-size: 0.88rem; }
 .bed-list { list-style: none; margin: 0.6rem 0 0; padding: 0; display: grid; gap: 0.3rem; }
@@ -272,7 +319,7 @@ button.is-on {
 .gap-tight text { fill: #ffb089; }
 .d-label { fill: var(--muted); font-size: 11px; font-family: var(--sans); }
 
-.board-tabs { display: flex; gap: 0.4rem; padding: 0.2rem 0.8rem 0; }
+.board-tabs { display: flex; flex-wrap: wrap; gap: 0.4rem; padding: 0.2rem 0.8rem 0; }
 .board-tabs button { border-radius: 10px; font-size: 0.82rem; }
 .warn-list { list-style: none; margin: 0.6rem 0.8rem 0.2rem; padding: 0; display: grid; gap: 0.4rem; }
 .guide { padding: 0.7rem 0.95rem 1.5rem; }

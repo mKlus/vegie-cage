@@ -77,6 +77,8 @@ export const PRICE_TABLE: PriceRow[] = [
   row('wire-2.5-100', '2.5 mm fencing wire, 100 m', 28, '100 m', UNVERIFIED, '2026-01-01', false),
   row('wire-2.5-500', '2.5 mm fencing wire, 500 m', 89, '500 m', UNVERIFIED, '2026-01-01', false),
   row('anchor', 'Screw-in ground anchor', 14, 'each', UNVERIFIED, '2026-01-01', false),
+  row('brace-clip', 'Star-picket brace clip', 4.5, 'each', UNVERIFIED, '2026-01-01', false),
+  row('strainer', 'Wire strainer (Gripple-style)', 6.8, 'each', UNVERIFIED, '2026-01-01', false),
   row('cap-10', 'Star picket safety caps, pack of 10', 12, '10', UNVERIFIED, '2026-01-01', false),
 ]
 

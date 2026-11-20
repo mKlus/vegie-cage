@@ -1,4 +1,4 @@
-import { Grid, OrbitControls } from '@react-three/drei'
+import { Grid, Html, OrbitControls } from '@react-three/drei'
 import { Canvas, useThree } from '@react-three/fiber'
 import { useLayoutEffect, useMemo, useRef, type RefObject } from 'react'
 import {
@@ -17,6 +17,7 @@ import {
   TubeGeometry,
   Vector3,
 } from 'three'
+import { STAY_COLOUR, type Vec3 } from '../lib/bracing'
 import type { CageGeometry, Point } from '../lib/geometry'
 
 type ControlsHandle = {
@@ -35,6 +36,7 @@ type CageSceneProps = {
   view: ViewId
   showNet: boolean
   showMesh: boolean
+  showBracing: boolean
   doorOpen: boolean
   selectedId: string | null
   onSelect: (id: string | null) => void
@@ -194,11 +196,28 @@ function CameraRig({
   return null
 }
 
+function rodGeometry(from: Vec3, to: Vec3, radius: number): TubeGeometry {
+  return new TubeGeometry(
+    new LineCurve3(new Vector3(from.x, from.y, from.z), new Vector3(to.x, to.y, to.z)),
+    1,
+    radius,
+    7,
+    false,
+  )
+}
+
+/** Layout keeps the brace on the wall line. Draw it just outside the mesh so the skin does not hide it. */
+function braceOutside(p: Vec3): Vec3 {
+  const sign = Math.sign(p.x) || 1
+  return { x: p.x + sign * 0.07, y: p.y, z: p.z }
+}
+
 function CageModel({
   input,
   geo,
   showNet,
   showMesh,
+  showBracing,
   doorOpen,
   selectedId,
   onSelect,
@@ -257,20 +276,20 @@ function CageModel({
           new Vector3(0, geo.peakY, input.length / 2 + RIDGE_PAST_END_M),
         ]),
         2,
-        pipeR * 0.85,
+        Math.max(pipeR * 0.9, 0.032),
         6,
         false,
       ),
     [geo.peakY, input.length, pipeR],
   )
   const purlinGeoms = useMemo(() => {
-    const radius = input.purlinMaterial === 'wire' ? 0.004 : pipeR * 0.8
+    const radius = input.purlinMaterial === 'wire' ? 0.028 : Math.max(pipeR * 0.8, 0.028)
     return geo.purlinPoints.map(
       (p) =>
         new TubeGeometry(
           new CatmullRomCurve3([
-            new Vector3(p.x, p.y, -input.length / 2),
-            new Vector3(p.x, p.y, input.length / 2),
+            new Vector3(p.x, p.y, -input.length / 2 - 0.12),
+            new Vector3(p.x, p.y, input.length / 2 + 0.12),
           ]),
           2,
           radius,
@@ -279,6 +298,16 @@ function CageModel({
         ),
     )
   }, [geo.purlinPoints, input.length, input.purlinMaterial, pipeR])
+
+  const bracingGeoms = useMemo(() => {
+    if (!showBracing) return { guys: [] as TubeGeometry[], braces: [] as TubeGeometry[] }
+    return {
+      guys: [...geo.bracing.endGuys, ...geo.bracing.sideGuys].map((g) => rodGeometry(g.from, g.to, 0.035)),
+      braces: geo.bracing.braces.map((b) => rodGeometry(braceOutside(b.from), braceOutside(b.to), 0.045)),
+    }
+  }, [showBracing, geo.bracing])
+
+  const windSign = geo.bracing.windward === '+x' ? 1 : -1
 
   return (
     <group>
@@ -393,20 +422,68 @@ function CageModel({
       })}
 
       <mesh geometry={ridgeGeom}>
-        <meshStandardMaterial color={hoopMat.colour} />
+        <meshStandardMaterial color={STAY_COLOUR.ridge} emissive="#2f6b38" emissiveIntensity={0.35} roughness={0.4} />
       </mesh>
       {purlinGeoms.map((g, i) => (
         <mesh key={`purlin-${i}`} geometry={g}>
           <meshStandardMaterial
-            color={input.purlinMaterial === 'wire' ? '#c5cdd2' : hoopMat.colour}
-            metalness={input.purlinMaterial === 'wire' ? 0.6 : 0.05}
+            color={input.purlinMaterial === 'wire' ? STAY_COLOUR.purlin : hoopMat.colour}
+            emissive={input.purlinMaterial === 'wire' ? STAY_COLOUR.purlin : '#000000'}
+            emissiveIntensity={input.purlinMaterial === 'wire' ? 0.4 : 0}
+            metalness={input.purlinMaterial === 'wire' ? 0.35 : 0.05}
+            roughness={0.4}
           />
         </mesh>
       ))}
 
       {input.sleeperBase ? <Sleeper input={input} /> : null}
 
-      {geo.extraPosts.map((post, i) => (
+      {showBracing ? (
+        <group>
+          {bracingGeoms.guys.map((g, i) => (
+            <mesh key={`guy-${i}`} geometry={g} renderOrder={2}>
+              <meshBasicMaterial color={STAY_COLOUR.guy} />
+            </mesh>
+          ))}
+          {bracingGeoms.braces.map((g, i) => (
+            <mesh key={`brace-${i}`} geometry={g} renderOrder={2}>
+              <meshBasicMaterial color={STAY_COLOUR.brace} />
+            </mesh>
+          ))}
+          {geo.bracing.braces.map((b, i) => {
+            const at = braceOutside(b.from)
+            return (
+              <mesh key={`clip-${i}`} position={[at.x, at.y, at.z]} renderOrder={2}>
+                <boxGeometry args={[0.08, 0.08, 0.08]} />
+                <meshBasicMaterial color="#f4f1c0" />
+              </mesh>
+            )
+          })}
+          {[...geo.bracing.endGuys, ...geo.bracing.sideGuys].map((g, i) => (
+            <group key={`anchor-${i}`} position={[g.to.x, 0, g.to.z]}>
+              <mesh position={[0, 0.14, 0]} renderOrder={2}>
+                <cylinderGeometry args={[0.04, 0.055, 0.28, 8]} />
+                <meshBasicMaterial color={STAY_COLOUR.anchor} />
+              </mesh>
+              <mesh position={[0, 0.02, 0]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
+                <circleGeometry args={[0.16, 16]} />
+                <meshBasicMaterial color={STAY_COLOUR.anchor} side={DoubleSide} />
+              </mesh>
+            </group>
+          ))}
+          <Html
+            position={[windSign * (input.width / 2 + geo.bracing.sideAnchorOutM + 0.45), 0.75, 0]}
+            center
+            style={{ pointerEvents: 'none' }}
+          >
+            <div className="wind-tag">Windward</div>
+          </Html>
+        </group>
+      ) : null}
+
+      {geo.extraPosts
+        .filter((post) => post.role !== 'stay')
+        .map((post, i) => (
         <group key={`x-${i}`} position={[post.x, 0, post.z]}>
           <mesh position={[0, (geo.stickUp - geo.embedDepth) / 2, 0]}>
             <cylinderGeometry args={[0.012, 0.012, geo.stickUp + geo.embedDepth, 6]} />
@@ -529,6 +606,7 @@ export function CageScene({
   view,
   showNet,
   showMesh,
+  showBracing,
   doorOpen,
   selectedId,
   onSelect,
@@ -564,6 +642,7 @@ export function CageScene({
         geo={geo}
         showNet={showNet}
         showMesh={showMesh}
+        showBracing={showBracing}
         doorOpen={doorOpen}
         selectedId={selectedId}
         onSelect={onSelect}

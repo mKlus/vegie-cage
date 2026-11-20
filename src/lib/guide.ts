@@ -1,6 +1,4 @@
 import {
-  GUY_COUNT,
-  GUY_EACH_M,
   HOG_SPACING_M,
   PURLIN_TAIL_M,
   RIDGE_PAST_END_M,
@@ -49,7 +47,12 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
   const hoop = HOOP_MATERIAL[input.hoopMaterial]
   const mesh = WALL_MESH[input.wallMesh]
   const pipe = pipeTakeoff(input, geo.hoopCount, geo.pipeEachM)
-  const wire = wireTakeoff(input, geo.hoopCount, geo.meshRunM)
+  const wire = wireTakeoff(input, geo.hoopCount, geo.meshRunM, geo.stickUp, geo.hoopZs)
+  const bracing = geo.bracing
+  const guyAngle = Math.round(bracing.endGuys[0]?.angleDeg ?? 45)
+  const sideFromEnd = bracing.sideGuys
+    .map((g) => round2(g.from.z + input.length / 2))
+    .sort((a, b) => a - b)
   const diagonal = Math.hypot(input.length, input.width)
   const hoopFromEnd = fromEnd(geo.hoopZs, input.length)
   const nearZ = -input.length / 2
@@ -91,8 +94,8 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
     },
     {
       id: 'stays',
-      title: 'Corner stays',
-      text: `Drive ${geo.pickets.stays} stays, one outside each corner, raked back to the end hoop. Same ${mm(input.embedDepth)} embed, same plumb check. They take the end guys.`,
+      title: 'Diagonal braces',
+      text: `The ${geo.pickets.stays} corner stays are diagonal braces, not extra vertical posts. Inside each end, run a star picket from the top of the corner hoop picket down to the ground ${formatM(bracing.braceFootM, 1)} along the side wall. Clip the top to the picket (${bracing.braceClipCount} brace clips). The foot goes into the ground. These braces do not take the guys. The Stays & bracing diagram shows the foot.`,
     },
     {
       id: 'sleeper',
@@ -144,7 +147,7 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
     {
       id: 'braces',
       title: 'End braces and guys',
-      text: `Brace both end hoops on the diagonal. ${GUY_COUNT} guys of about ${formatM(GUY_EACH_M, 1)} each, down to ${GUY_COUNT} ground anchors outside the ends. Strain the purlins and the guys after the hoops are tied.`,
+      text: `End guys: 2.5 mm wire from each corner picket top, out along the length at about ${guyAngle}°, to a ground anchor ${formatM(bracing.endAnchorOutM)} past the end wall. ${bracing.endGuys.length} end guys. Side guys: windward wall (${bracing.windward}), every second hoop from ${origin} (${listM(sideFromEnd)}). Each runs square to the wall, ${formatM(bracing.sideAnchorOutM)} out, down to an anchor. ${bracing.sideGuys.length} side guys. ${bracing.endGuys.length} end + ${bracing.sideGuys.length} side = ${bracing.anchorCount} ground anchors. One wire strainer (Gripple) on each guy (${bracing.strainerCount}). The ${bracing.braceClipCount} brace clips are already on the diagonal braces. Strain the purlins and the guys after the hoops are tied. Layout, angle, and dimensions are on the Stays & bracing diagram.`,
     },
     {
       id: 'door',
@@ -173,13 +176,13 @@ export function buildGuide(input: CageInputs, geo: CageGeometry): Step[] {
       title: 'Picket caps',
       text:
         geo.pickets.caps > 0
-          ? `Fit safety caps on the ${geo.pickets.caps} pickets the hoop does not cover: end wall${geo.pickets.jambs ? ', door jambs,' : ''} and corner stays. Hoop pickets are sleeved and stay bare. Cap the bare ones before you leave the site.`
+          ? `Fit safety caps on the ${geo.pickets.caps} pickets the hoop does not cover: end wall${geo.pickets.jambs ? ', door jambs,' : ''} and diagonal braces. Hoop pickets are sleeved and stay bare. Cap the bare ones before you leave the site.`
           : `This post type does not take a star-picket cap. Still cover or file any sharp top before you leave the site.`,
     },
     {
       id: 'check',
       title: 'Final check',
-      text: `Walk the cage. Line wires${input.purlins === 3 ? ' and purlins are' : ' are'} tight. Every hoop is tied ${input.purlins === 3 ? 'at the ridge and at both purlins' : 'at the ridge'}, tails folded in. No rattle in the sleeves. Mesh stops below ${formatM(geo.sleeveBot, 2)}. No gap at the sleeper, the door, or the net overlap that a rabbit or a bird can use. Guys are on both ends, anchors are in. Caps are on every bare picket. Peak still reads ${formatM(input.peakHeight, 2)}.${input.doorStyle === 'mesh-gate' ? ' Gate closes, latches, and clears the ground.' : ''}`,
+      text: `Walk the cage. Line wires${input.purlins === 3 ? ' and purlins are' : ' are'} tight. Every hoop is tied ${input.purlins === 3 ? 'at the ridge and at both purlins' : 'at the ridge'}, tails folded in. No rattle in the sleeves. Mesh stops below ${formatM(geo.sleeveBot, 2)}. No gap at the sleeper, the door, or the net overlap that a rabbit or a bird can use. End guys on both ends, windward side guys on every second hoop, one anchor and one strainer on each guy, ${bracing.braceCount} diagonal braces clipped. Caps are on every bare picket. Peak still reads ${formatM(input.peakHeight, 2)}.${input.doorStyle === 'mesh-gate' ? ' Gate closes, latches, and clears the ground.' : ''}`,
     },
   ]
 

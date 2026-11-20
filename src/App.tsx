@@ -4,6 +4,7 @@ import { BuildGuide } from './components/BuildGuide'
 import { CageScene, type ViewId } from './components/CageScene'
 import { Controls, type BedDraft } from './components/Controls'
 import { Diagrams } from './components/Diagrams'
+import { BracingLegend, StaysDiagram } from './components/StaysDiagram'
 import { PlanEditor } from './components/PlanEditor'
 import { ThemeSwitch } from './components/ThemeSwitch'
 import { OWNED_BIRDIE, makeBed, packOwnedFour, snap } from './lib/birdies'
@@ -34,8 +35,9 @@ export default function App() {
   const [view, setView] = useState<ViewId>(viewFromSearch)
   const [showNet, setShowNet] = useState(true)
   const [showMesh, setShowMesh] = useState(true)
+  const [showBracing, setShowBracing] = useState(true)
   const [doorOpen, setDoorOpen] = useState(true)
-  const [board, setBoard] = useState<'bom' | 'guide'>('bom')
+  const [board, setBoard] = useState<'bom' | 'guide' | 'stays'>('bom')
   const [ready, setReady] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [placing, setPlacing] = useState(false)
@@ -298,6 +300,10 @@ export default function App() {
               <input type="checkbox" checked={doorOpen} onChange={(e) => setDoorOpen(e.target.checked)} />
               Door open
             </label>
+            <label>
+              <input type="checkbox" checked={showBracing} onChange={(e) => setShowBracing(e.target.checked)} />
+              Show stays & bracing
+            </label>
             <span className="drag-hint">
               {view === 'plan' ? 'Drag beds on the grid' : 'Drag to orbit · scroll zoom'}
             </span>
@@ -321,16 +327,20 @@ export default function App() {
                 onPlace={placeAt}
               />
             ) : (
-              <CageScene
-                input={input}
-                geo={geo}
-                view={view}
-                showNet={showNet}
-                showMesh={showMesh}
-                doorOpen={doorOpen}
-                selectedId={selectedId}
-                onSelect={setSelectedId}
-              />
+              <>
+                <CageScene
+                  input={input}
+                  geo={geo}
+                  view={view}
+                  showNet={showNet}
+                  showMesh={showMesh}
+                  showBracing={showBracing}
+                  doorOpen={doorOpen}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                />
+                {showBracing ? <BracingLegend scene windward={geo.bracing.windward} /> : null}
+              </>
             )}
           </div>
         </section>
@@ -365,11 +375,22 @@ export default function App() {
             >
               Build guide
             </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={board === 'stays'}
+              className={board === 'stays' ? 'is-on' : undefined}
+              onClick={() => setBoard('stays')}
+            >
+              Stays & bracing
+            </button>
           </div>
           {board === 'bom' ? (
             <BomPanel input={input} geo={geo} bom={bom} />
-          ) : (
+          ) : board === 'guide' ? (
             <BuildGuide steps={result.guide} />
+          ) : (
+            <StaysDiagram input={input} geo={geo} />
           )}
         </aside>
       </div>

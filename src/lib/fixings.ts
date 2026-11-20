@@ -1,3 +1,4 @@
+import { layoutBracing } from './bracing'
 import type { CageInputs, PurlinMaterial, PurlinSet } from './model'
 
 /** Ridge pipe past each end hoop. One continuous length, cut from the hoop coil. */
@@ -8,9 +9,6 @@ export const TIE_PER_CROSSING_M = 0.5
 
 /** Purlin wire beyond the end hoop, each end, to the brace or ground anchor. */
 export const PURLIN_TAIL_M = 2
-
-export const GUY_COUNT = 4
-export const GUY_EACH_M = 4
 
 export const TIE_WIRE_STOCK_M = 30
 export const HOG_SPACING_M = 0.2
@@ -55,9 +53,11 @@ export function pipeTakeoff(
 }
 
 export function wireTakeoff(
-  input: Pick<CageInputs, 'length' | 'purlins' | 'purlinMaterial' | 'sleeperBase'>,
+  input: Pick<CageInputs, 'length' | 'width' | 'purlins' | 'purlinMaterial' | 'sleeperBase' | 'doorWall'>,
   hoopCount: number,
   meshRunM: number,
+  stickUp: number,
+  hoopZs: readonly number[],
 ): {
   lineCount: number
   lineM: number
@@ -72,7 +72,13 @@ export function wireTakeoff(
   const lineM = lineCount * meshRunM * 1.05
   const purlinEach = purlinRunM(input.length)
   const purlinWireM = input.purlins === 3 && input.purlinMaterial === 'wire' ? 2 * purlinEach : 0
-  const guyM = GUY_COUNT * GUY_EACH_M
+  const guyM = layoutBracing({
+    length: input.length,
+    width: input.width,
+    stickUp,
+    hoopZs,
+    doorWall: input.doorWall,
+  }).guyWireM
   const tieCount = tieCrossingCount(hoopCount, input.purlins)
   const tieM = tieCount * TIE_PER_CROSSING_M
   return {

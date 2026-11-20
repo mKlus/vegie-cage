@@ -1,5 +1,6 @@
 import { archShoulderPoint, buildArch } from './arch'
 import { bedBox, bedFootprint, bedInsideCage, boxesOverlap, type PlacedBed } from './birdies'
+import { layoutBracing, type Bracing } from './bracing'
 import { frameHeights, HOOP_MATERIAL, SLEEPER, STAR_ACROSS_MM, WALL_MESH, type CageInputs, round2 } from './model'
 import { windCheck, type WindCheck } from './wind'
 
@@ -77,6 +78,8 @@ export type CageGeometry = {
   minBendRadius: number
   bendAt: 'shoulder' | 'crown'
   purlinPoints: Point[]
+  /** End guys, windward side guys, diagonal braces, and the anchor/clip counts. */
+  bracing: Bracing
   pickets: PicketTakeoff
   extraPosts: ExtraPost[]
   /** Galvanised round posts for a mesh gate. Empty when the door is a pine leaf on picket jambs. */
@@ -454,6 +457,13 @@ export function buildGeometry(input: CageInputs): CageGeometry {
     minBendRadius: round2(arch.minBendRadius),
     bendAt: arch.bendAt,
     purlinPoints: purlin ? [purlin.left, purlin.right] : [],
+    bracing: layoutBracing({
+      length: input.length,
+      width: input.width,
+      stickUp: frame.stickUp,
+      hoopZs,
+      doorWall: input.doorWall,
+    }),
     pickets: posts.pickets,
     extraPosts: posts.extraPosts,
     doorPosts: layoutDoorPosts(input),

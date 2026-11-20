@@ -1,7 +1,6 @@
 import { bedLabel, bedSku, growingM2, soilM3 } from './birdies'
+import { guyExact } from './bracing'
 import {
-  GUY_COUNT,
-  GUY_EACH_M,
   HOG_SPACING_M,
   PURLIN_TAIL_M,
   RIDGE_PAST_END_M,
@@ -230,7 +229,7 @@ export function buildBom(input: CageInputs): BomResult {
           ownedPosts > 0
             ? `already have ${ownedPosts}; buy ${postBuy}`
             : `${postCount} × ${input.picketLength.toFixed(2)} m`,
-        note: `Embed ${(input.embedDepth * 1000).toFixed(0)} mm, stick-up ${geo.stickUp.toFixed(2)} m. ${geo.pickets.hoop} under hoops (no caps), ${geo.pickets.end} end-wall${jambBit}, ${geo.pickets.stays} corner stays.${galstar ? ' Galvanised.' : ''}${ownedBit} ${postQuote.source}.`,
+        note: `Embed ${(input.embedDepth * 1000).toFixed(0)} mm, stick-up ${geo.stickUp.toFixed(2)} m. ${geo.pickets.hoop} under hoops (no caps), ${geo.pickets.end} end-wall${jambBit}, ${geo.pickets.stays} diagonal braces.${galstar ? ' Galvanised.' : ''}${ownedBit} ${postQuote.source}.`,
       },
       postBuy,
       postQuote.aud,
@@ -252,8 +251,8 @@ export function buildBom(input: CageInputs): BomResult {
           buy: `${packs} × pack of 10`,
           note:
             input.doorStyle === 'mesh-gate'
-              ? 'Only pickets the hoop does not cover: end wall and corner stays. Hoop pickets are sleeved. The concreted door posts take no caps.'
-              : 'Only pickets the hoop does not cover: end wall, door jambs, corner stays. Hoop pickets are sleeved.',
+              ? 'Only pickets the hoop does not cover: end wall and diagonal braces. Hoop pickets are sleeved. The concreted door posts take no caps.'
+              : 'Only pickets the hoop does not cover: end wall, door jambs, diagonal braces. Hoop pickets are sleeved.',
         },
         packs,
         cap.aud,
@@ -557,7 +556,8 @@ export function buildBom(input: CageInputs): BomResult {
     )
   }
 
-  const wire = wireTakeoff(input, geo.hoopCount, geo.meshRunM)
+  const wire = wireTakeoff(input, geo.hoopCount, geo.meshRunM, geo.stickUp, geo.hoopZs)
+  const bracing = geo.bracing
   const lineCount = wire.lineCount
   const lineM = wire.lineM
   const purlinWireM = wire.purlinWireM
@@ -610,14 +610,14 @@ export function buildBom(input: CageInputs): BomResult {
       {
         id: 'guys',
         category: 'Frame',
-        item: 'End guys',
-        spec: '2.5 mm wire, diagonal, both end hoops',
-        exact: `${GUY_COUNT} × ${GUY_EACH_M} m = ${guyM} m`,
+        item: 'Guys',
+        spec: '2.5 mm wire, about 45° where the stick-up allows',
+        exact: guyExact(bracing),
         exactM: guyM,
         buy: 'Included in the 2.5 mm high-tensile coil',
-        note: 'One pair on each end hoop, down to a ground anchor. These are the diagonal braces.',
+        note: 'End guys leave the four corner picket tops and run out along the length. Side guys leave every second hoop on the windward wall. Straight run, plus a wrap at each end. Not the star-picket braces.',
       },
-      0,
+      bracing.guyCount,
       0,
       false,
     ),
@@ -649,13 +649,49 @@ export function buildBom(input: CageInputs): BomResult {
         category: 'Frame',
         item: 'Ground anchors',
         spec: anchor.label,
-        exact: `${GUY_COUNT} anchors`,
-        exactM: GUY_COUNT,
-        buy: `${GUY_COUNT} anchors`,
-        note: 'One per guy, outside the end hoops.',
+        exact: `${bracing.endGuys.length} end + ${bracing.sideGuys.length} side = ${bracing.anchorCount}`,
+        exactM: bracing.anchorCount,
+        buy: `${bracing.anchorCount} anchors`,
+        note: `One per guy. ${bracing.endGuys.length} outside the ends, ${bracing.sideGuys.length} on the windward side. ${anchor.source}.`,
       },
-      GUY_COUNT,
+      bracing.anchorCount,
       anchor.aud,
+    ),
+  )
+
+  const braceClip = price('brace-clip')
+  lines.push(
+    moneyLine(
+      {
+        id: 'brace-clips',
+        category: 'Frame',
+        item: 'Brace clips',
+        spec: braceClip.label,
+        exact: `${bracing.braceClipCount} clips`,
+        exactM: bracing.braceClipCount,
+        buy: `${bracing.braceClipCount} clips`,
+        note: `One per diagonal brace, where the stay meets the corner picket top. ${braceClip.source}.`,
+      },
+      bracing.braceClipCount,
+      braceClip.aud,
+    ),
+  )
+
+  const strainer = price('strainer')
+  lines.push(
+    moneyLine(
+      {
+        id: 'strainers',
+        category: 'Frame',
+        item: 'Wire strainers',
+        spec: strainer.label,
+        exact: `${bracing.strainerCount} strainers (one per guy)`,
+        exactM: bracing.strainerCount,
+        buy: `${bracing.strainerCount} strainers`,
+        note: `One Gripple or wire strainer on each end guy and each windward side guy. ${strainer.source}.`,
+      },
+      bracing.strainerCount,
+      strainer.aud,
     ),
   )
 

@@ -76,6 +76,9 @@ describe('buildGeometry', () => {
     expect(geo.net.endAreaM2).toBeGreaterThan(4)
     expect(geo.net.buy).toBe('3 × 4 × 10 m')
     expect(geo.purlinPoints).toHaveLength(2)
+    expect(geo.bracing.anchorCount).toBe(4 + geo.bracing.sideGuys.length)
+    expect(geo.bracing.braceCount).toBe(4)
+    expect(geo.bracing.sideGuys).toHaveLength(5)
   })
 
   it('still places 13 hoops on the 12 × 6 preset', () => {
