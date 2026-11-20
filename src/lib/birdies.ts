@@ -78,7 +78,25 @@ export function boxesOverlap(a: PlacedBed, b: PlacedBed, gap = 0.04): boolean {
   return A.x0 < B.x1 + gap && A.x1 + gap > B.x0 && A.z0 < B.z1 + gap && A.z1 + gap > B.z0
 }
 
-export function bedInsideCage(b: PlacedBed, cageLength: number, cageWidth: number, margin = 0.05): boolean {
+/**
+ * Picket-centre span minus this is the clear width inside the 50 mm sleepers
+ * (30 mm each side). 4.6 m centres → 4.54 m clear.
+ */
+export const SLEEPER_INNER_INSET_M = 0.03
+
+/** Gap from a bed edge to the picket line, when the edge is on the sleeper inner face (about 5 mm off counts). */
+export function onSleeperInnerFace(gapToPicket: number, slack = 0.015): boolean {
+  const toInner = gapToPicket - SLEEPER_INNER_INSET_M
+  return toInner >= -1e-9 && toInner <= slack + 1e-9
+}
+
+/** A bed up to the sleeper inner face is inside. The hoop leg is still vertical there. */
+export function bedInsideCage(
+  b: PlacedBed,
+  cageLength: number,
+  cageWidth: number,
+  margin = SLEEPER_INNER_INSET_M,
+): boolean {
   const box = bedBox(b)
   return (
     box.x0 >= -cageWidth / 2 + margin &&
@@ -104,11 +122,15 @@ export function makeBed(partial: Partial<PlacedBed> & Pick<PlacedBed, 'x' | 'z'>
 }
 
 /**
- * Marek's 10 × 4.6 m plan. Door at z = -5 on the centreline, opening outward.
- * Six 61×305 along the long walls, three per side, 0.20 m apart and 0.225 m off each end.
+ * Marek's beds, built on the 5 m layout. On the 4.6 m cage the aisles stay as built.
+ * Door at z = -5 on the centreline, opening outward.
+ * Six 61×305 hard against the long walls, centres at x = ±1.96 (outer edge ~5 mm
+ * inside the sleeper inner face; clear width 4.54 m). About 1.04 m to the middle beds.
+ * Three per side, 0.20 m apart and 0.225 m off each end.
  * Two 122×244 on the centreline toward the far end, 1.21 m apart, far bed 0.23 m off the end wall.
  * Owned: both 122×244 and the two 61×305 nearest the door (two kits were cut down).
  * L is -x, R is +x, index 1 is the door end.
+ * Wall x is not snapped: 1.96 is off the 50 mm grid, and snap would pull it to 1.95.
  */
 export function marekBeds(): PlacedBed[] {
   const base = {
@@ -126,11 +148,11 @@ export function marekBeds(): PlacedBed[] {
   ]
   const along = (side: 'L' | 'R', x: number): PlacedBed[] =>
     stations.map(({ n, z, owned }) =>
-      makeBed({ ...wall, id: `wall-${side}${n}`, x: snap(x), z: snap(z), owned }),
+      makeBed({ ...wall, id: `wall-${side}${n}`, x, z: snap(z), owned }),
     )
   return [
-    ...along('L', -1.75),
-    ...along('R', 1.75),
+    ...along('L', -1.96),
+    ...along('R', 1.96),
     makeBed({ ...mid, id: 'mid-1', x: snap(0), z: snap(-0.1), owned: true }),
     makeBed({ ...mid, id: 'mid-2', x: snap(0), z: snap(3.55), owned: true }),
   ]

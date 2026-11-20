@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { bedBox, bedInsideCage, boxesOverlap, marekBeds, packOwnedFour, snap } from './birdies'
+import { bedBox, bedInsideCage, boxesOverlap, marekBeds, packOwnedFour, SLEEPER_INNER_INSET_M, snap } from './birdies'
 
 describe('packOwnedFour', () => {
   it('drops four 122 × 244 beds inside a 12 × 6 cage', () => {
@@ -34,7 +34,7 @@ describe('marekBeds', () => {
       ['wall-L2', 0],
       ['wall-L3', 3.25],
     ] as const) {
-      expect(byId[id]?.x).toBeCloseTo(-1.75, 2)
+      expect(byId[id]?.x).toBeCloseTo(-1.96, 2)
       expect(byId[id]?.z).toBeCloseTo(z, 2)
       expect(byId[id]?.width).toBeCloseTo(0.61)
       expect(byId[id]?.length).toBeCloseTo(3.05)
@@ -44,7 +44,7 @@ describe('marekBeds', () => {
       ['wall-R2', 0],
       ['wall-R3', 3.25],
     ] as const) {
-      expect(byId[id]?.x).toBeCloseTo(1.75, 2)
+      expect(byId[id]?.x).toBeCloseTo(1.96, 2)
       expect(byId[id]?.z).toBeCloseTo(z, 2)
     }
     expect(byId['mid-1']).toMatchObject({ x: 0, owned: true, width: 1.22, length: 2.44 })
@@ -55,6 +55,18 @@ describe('marekBeds', () => {
     expect(byId['wall-L1']?.owned).toBe(true)
     expect(byId['wall-R1']?.owned).toBe(true)
     expect(['wall-L2', 'wall-L3', 'wall-R2', 'wall-R3'].every((id) => byId[id]?.owned === false)).toBe(true)
+
+    const wall = byId['wall-R1']!
+    const outer = wall.x + wall.width / 2
+    const innerFace = 4.6 / 2 - SLEEPER_INNER_INSET_M
+    expect(innerFace - outer).toBeCloseTo(0.005, 3)
+    const mid = byId['mid-1']!
+    expect(wall.x - wall.width / 2 - (mid.x + mid.width / 2)).toBeCloseTo(1.045, 3)
+  })
+
+  it('rejects a bed past the sleeper inner face', () => {
+    const bed = { ...marekBeds()[0]!, x: 2.2 }
+    expect(bedInsideCage(bed, 10, 4.6)).toBe(false)
   })
 })
 

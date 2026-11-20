@@ -181,6 +181,8 @@ describe('buildGeometry', () => {
     expect(marek.some((w) => w.level === 'info' && /rabbit or fox/.test(w.text) && /150 mm/.test(w.text))).toBe(true)
     expect(marek.some((w) => /50 mm mesh/.test(w.text))).toBe(false)
     expect(marek.some((w) => /not certified engineering/.test(w.text) && w.level === 'warn')).toBe(true)
+    expect(marek.some((w) => w.level === 'bad' && /outside the cage/.test(w.text))).toBe(false)
+    expect(marek.some((w) => /outer beds and the fence/.test(w.text))).toBe(false)
     expect(marek.some((w) => /Hoop spacing over 1\.2 m/.test(w.text))).toBe(true)
     expect(marek.some((w) => /slides over a MaxY/.test(w.text))).toBe(true)
     expect(buildGeometry(DEFAULTS).wind.over).toBe(false)

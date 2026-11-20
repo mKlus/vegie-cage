@@ -3,6 +3,7 @@ import {
   bedFootprint,
   boxesOverlap,
   makeBed,
+  onSleeperInnerFace,
   snap,
   type PlacedBed,
 } from './birdies'
@@ -122,6 +123,11 @@ function overlap1d(a0: number, a1: number, b0: number, b1: number): number {
   return Math.max(0, Math.min(a1, b1) - Math.max(a0, b0))
 }
 
+/** Aisle met, or the bed is up to the sleeper inner face (hoop leg still vertical). */
+function sideWallOk(gapToPicket: number, aisleMin: number): boolean {
+  return gapToPicket + 1e-6 >= aisleMin || onSleeperInnerFace(gapToPicket)
+}
+
 export function measureGaps(
   beds: PlacedBed[],
   cage: { length: number; width: number } & Aisles,
@@ -146,7 +152,7 @@ export function measureGaps(
         x2: box.x0,
         z2: b.z,
         metres: round2(left),
-        ok: left + 1e-6 >= wx,
+        ok: sideWallOk(left, wx),
         kind: 'wall',
         label: `${fmtGap(left)} wall`,
       })
@@ -158,7 +164,7 @@ export function measureGaps(
         x2: halfW,
         z2: b.z,
         metres: round2(right),
-        ok: right + 1e-6 >= wx,
+        ok: sideWallOk(right, wx),
         kind: 'wall',
         label: `${fmtGap(right)} wall`,
       })
